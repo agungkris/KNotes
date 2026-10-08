@@ -1,0 +1,1326 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KNotes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --bg:#F3F6FA; --surface:#FFFFFF; --ink:#16263D; --muted:#5B6B80; --line:#D9E2EC;
+  --blue:#2A5D8F; --sky:#D6E8F7; --sky2:#B7D3EC; --sun:#F2B705; --sunbg:#FFF4CC;
+  --ok:#1F8A5B; --okbg:#E3F4EC; --late:#C9372C; --latebg:#FBE6E3; --early:#2A5D8F; --earlybg:#E1EDF8;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1722; --surface:#172234; --ink:#E8EEF6; --muted:#9AAABD; --line:#2A3A52;
+    --blue:#7FB0DE; --sky:#20344D; --sky2:#2D4A6C; --sun:#F5C842; --sunbg:#3A3214;
+    --ok:#4CC38A; --okbg:#143528; --late:#F0776C; --latebg:#3A1C1A; --early:#7FB0DE; --earlybg:#1C2F47;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1722; --surface:#172234; --ink:#E8EEF6; --muted:#9AAABD; --line:#2A3A52;
+  --blue:#7FB0DE; --sky:#20344D; --sky2:#2D4A6C; --sun:#F5C842; --sunbg:#3A3214;
+  --ok:#4CC38A; --okbg:#143528; --late:#F0776C; --latebg:#3A1C1A; --early:#7FB0DE; --earlybg:#1C2F47;
+  color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Lexend,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-weight:400;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-in{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.brand{font-weight:700;font-size:1.05rem;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.brand-dot{width:12px;height:12px;border-radius:50%;background:var(--sun);box-shadow:0 0 0 3px var(--sunbg)}
+.lesson-pick{flex:1;min-width:160px;max-width:360px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px}
+.tab{border:0;background:transparent;padding:7px 14px;border-radius:9px;font-weight:500;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--blue);color:#fff}
+:root[data-theme="dark"] .tab[aria-selected="true"]{color:#0F1722}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tab[aria-selected="true"]{color:#0F1722}}
+
+main{max-width:1100px;margin:0 auto;padding:16px 16px 120px}
+
+.hour{margin:4px 0 18px}
+.hour-track{position:relative;display:flex;height:44px;border-radius:12px;overflow:hidden;background:var(--sky)}
+.seg{position:relative;height:100%;border-right:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:600;color:var(--blue);background:var(--sky2);min-width:0;overflow:hidden;transition:background .2s}
+.seg:nth-child(even){background:var(--sky)}
+.seg.past{background:var(--blue);color:var(--surface)}
+.seg.cur{background:var(--sun);color:#16263D}
+.seg.over{background:repeating-linear-gradient(135deg,var(--latebg) 0 6px,var(--surface) 6px 12px);color:var(--late)}
+.class-end{position:absolute;top:-6px;bottom:-6px;width:3px;background:var(--ink);border-radius:2px;z-index:3}
+.needle{position:absolute;top:-8px;bottom:-8px;width:4px;margin-left:-2px;background:var(--late);border-radius:3px;z-index:4;display:none;box-shadow:0 0 0 2px var(--surface)}
+.hour-scale{position:relative;height:20px;font-size:.72rem;color:var(--muted);margin-top:4px}
+.hour-scale span{position:absolute;transform:translateX(-50%)}
+.hour-scale span:first-child{transform:none}
+
+.teach{display:grid;gap:16px;grid-template-columns:1fr}
+@media (min-width:880px){.teach{grid-template-columns:minmax(320px,400px) 1fr;align-items:start}.side{position:sticky;top:76px}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.slide-no{color:var(--muted);font-size:.85rem}
+.slide-title{font-size:1.35rem;font-weight:600;line-height:1.25;margin:2px 0 14px;letter-spacing:-.01em}
+.timers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.timer{border-radius:14px;padding:12px 12px 10px;background:var(--sky)}
+.timer.slide{background:var(--sunbg)}
+.big{font-size:2.7rem;font-weight:700;line-height:1;letter-spacing:-.03em}
+.big.warn{color:#B07F00} .big.over{color:var(--late)}
+:root[data-theme="dark"] .big.warn{color:var(--sun)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .big.warn{color:var(--sun)}}
+.big-label{color:var(--muted);font-size:.8rem;margin-top:6px;line-height:1.3}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-weight:600;font-size:.9rem;margin-top:14px}
+.chip.ok{background:var(--okbg);color:var(--ok)} .chip.late{background:var(--latebg);color:var(--late)} .chip.early{background:var(--earlybg);color:var(--early)} .chip.idle{background:var(--sky);color:var(--blue)}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);font-size:.9rem}
+.facts b{display:block;font-size:1.05rem}
+.facts span{color:var(--muted);font-size:.8rem}
+
+.kids{margin-top:16px}
+.kids-head{display:flex;justify-content:space-between;align-items:baseline;font-weight:600}
+.kids-head small{color:var(--muted);font-weight:400}
+.dots{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.dot{width:40px;height:40px;border-radius:50%;border:2px solid var(--blue);background:transparent;font-weight:600;font-size:.85rem;color:var(--blue)}
+.dot[aria-pressed="true"]{background:var(--blue);color:var(--surface)}
+.nokids{color:var(--muted);font-size:.9rem;margin-top:6px}
+
+.script h3,.notes h3{font-size:.95rem;margin:0 0 10px;color:var(--muted);font-weight:500}
+.line{padding:12px 0;border-top:1px solid var(--line)}
+.line:first-of-type{border-top:0;padding-top:0}
+.en{font-size:1.18rem;font-weight:500;line-height:1.45}
+.id{color:var(--muted);margin-top:4px;font-size:1rem}
+.lang{display:inline-block;font-size:.68rem;font-weight:600;border-radius:5px;padding:1px 5px;margin-right:6px;vertical-align:2px}
+.lang.e{background:var(--sky);color:var(--blue)} .lang.i{background:var(--sunbg);color:var(--ink)}
+.notes{margin-top:16px;background:var(--sunbg);border:0}
+.notes p{margin:0;white-space:pre-wrap;font-size:.95rem}
+.next{margin-top:16px;color:var(--muted);font-size:.9rem;display:flex;gap:10px;align-items:center}
+.next b{color:var(--ink);font-weight:500}
+
+.controls{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.controls-in{max-width:1100px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);padding:12px 16px;border-radius:12px;font-weight:600;min-height:48px}
+.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.controls .btn.primary{flex:1}
+:root[data-theme="dark"] .btn.primary{color:#0F1722}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#0F1722}}
+.btn.go{flex:1.3}
+.btn.ghost{border-color:transparent;color:var(--muted);font-weight:500}
+.btn.danger{color:var(--late)}
+.btn.small{min-height:36px;padding:6px 12px;font-weight:500;font-size:.9rem}
+.btn:disabled{opacity:.45;cursor:default}
+
+.recap table{width:100%;border-collapse:collapse;font-size:.92rem}
+.recap th,.recap td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+.recap td.r,.recap th.r{text-align:right}
+.plus{color:var(--late);font-weight:600} .minus{color:var(--ok);font-weight:600}
+
+.plan-head{display:grid;gap:12px;grid-template-columns:1fr;margin-bottom:14px}
+@media (min-width:700px){.plan-head{grid-template-columns:2fr 1fr 1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted)}
+label.f input,label.f textarea,label.f select{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:1rem}
+label.f textarea{min-height:80px;resize:vertical;line-height:1.45}
+.sum{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:4px 0 6px;font-size:.95rem}
+.sum b{font-size:1.1rem}
+.rows{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface)}
+.row{border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row-btn{width:100%;display:grid;grid-template-columns:28px auto 1fr auto;gap:10px;align-items:center;text-align:left;background:transparent;border:0;padding:12px 14px}
+.row-btn:hover{background:var(--bg)}
+.row-n{width:28px;height:28px;border-radius:8px;background:var(--sky);color:var(--blue);display:grid;place-items:center;font-weight:600;font-size:.8rem}
+.row-t{font-weight:500;line-height:1.3}
+.row-meta{color:var(--muted);font-size:.8rem;margin-top:2px}
+.row-r{text-align:right;font-size:.85rem;white-space:nowrap}
+.row-r b{display:block;font-size:1rem}
+.chev{display:inline-block;transition:transform .15s;color:var(--muted);margin-left:6px}
+.row.open .chev{transform:rotate(90deg)}
+.editor{display:none;padding:4px 14px 16px 52px;gap:12px}
+.row.open .editor{display:grid}
+.ed-grid{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+.hint{font-size:.78rem;color:var(--muted)}
+.ed-actions{display:flex;flex-wrap:wrap;gap:8px}
+.ed-actions .btn{min-height:40px;padding:8px 12px;font-weight:500}
+.plan-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.last{color:var(--muted)}
+.foot{color:var(--muted);font-size:.78rem;margin-top:22px}
+
+/* script pairs */
+.pairs-title{font-size:.82rem;color:var(--muted)}
+.pairs{display:grid;gap:8px}
+.pair{display:grid;grid-template-columns:1fr auto;gap:6px 8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.pair textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);resize:vertical;line-height:1.4;min-height:44px}
+.pair .pen{font-weight:500}
+.pair .pid{color:var(--muted);background:transparent;border-style:dashed}
+.pair .x{grid-row:1;grid-column:2;border:0;background:transparent;color:var(--muted);font-size:1.2rem;width:32px;height:32px;border-radius:8px}
+.pair .x:hover{background:var(--latebg);color:var(--late)}
+.pid-row{grid-column:1/-1;display:grid;gap:4px}
+.tstat{font-size:.74rem;color:var(--muted);border:0;background:transparent;padding:0;text-align:left}
+.tstat.err{color:var(--late);text-decoration:underline;cursor:pointer}
+.tstat.busy{color:var(--blue)}
+
+/* import */
+.import{margin-bottom:16px;border:2px dashed var(--sky2);background:var(--surface)}
+.import-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.import-top h2{font-size:1.05rem;margin:0;font-weight:600}
+.import-top p{margin:2px 0 0;color:var(--muted);font-size:.88rem}
+.imp-form{display:none;margin-top:14px;gap:12px}
+.import.open .imp-form{display:grid}
+.imp-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:22px;border-radius:12px;background:var(--sky);color:var(--blue);text-align:center;cursor:pointer;font-weight:500}
+.drop small{color:var(--muted);font-weight:400}
+.drop.has{background:var(--okbg);color:var(--ok)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.prog{display:grid;gap:4px;font-size:.9rem}
+.prog .st{display:flex;gap:8px;align-items:baseline}
+.prog .st i{font-style:normal;width:16px;flex:none;text-align:center}
+.prog .st.done{color:var(--ok)} .prog .st.err{color:var(--late)} .prog .st.wait{color:var(--muted)}
+.bar{height:8px;border-radius:99px;background:var(--sky);overflow:hidden}
+.bar>div{height:100%;background:var(--blue);width:0;transition:width .3s}
+.msg{padding:10px 12px;border-radius:10px;font-size:.9rem}
+.msg.ok{background:var(--okbg);color:var(--ok)} .msg.err{background:var(--latebg);color:var(--late)} .msg.info{background:var(--sky);color:var(--blue)}
+.banner{background:var(--sunbg);color:var(--ink);font-size:.88rem;padding:8px 16px;text-align:center;border-bottom:1px solid var(--line)}
+.dlg-back{position:fixed;inset:0;background:rgba(10,20,35,.5);display:grid;place-items:center;z-index:60;padding:16px}
+.dlg{background:var(--surface);color:var(--ink);border-radius:16px;padding:20px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.dlg h3{margin:0 0 12px;font-size:1.1rem}
+.dlg p{margin:0 0 16px}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.btn.dangerfill{background:var(--late);border-color:var(--late);color:#fff}
+.choice{display:grid;gap:8px;margin-bottom:14px}
+.choice button{text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 14px}
+.choice button b{display:block;font-weight:600}
+.choice button span{color:var(--muted);font-size:.86rem}
+.choice button:hover{border-color:var(--blue)}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:70;font-size:.92rem;max-width:calc(100% - 32px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.newbtn{border:1px solid var(--blue);color:var(--blue);background:var(--surface);padding:7px 12px;border-radius:10px;font-weight:600;white-space:nowrap}
+.slideview{padding:10px;margin-bottom:16px}
+.slideview .frame{aspect-ratio:16/9;width:100%;border-radius:10px;overflow:hidden;background:var(--sky);display:grid;place-items:center;color:var(--muted);font-size:.9rem;text-align:center;padding:12px}
+.slideview .frame:has(img){padding:0}
+.slideview img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
+.slideview .cap{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;color:var(--muted);margin-top:8px;padding:0 4px}
+.slideview .cap b{color:var(--ink);font-weight:600}
+.thumb{width:72px;aspect-ratio:16/9;border-radius:6px;overflow:hidden;background:var(--sky);display:grid;place-items:center;font-size:.7rem;color:var(--muted);flex:none}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.deckbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.deckbar .t span{color:var(--muted);display:block;font-size:.84rem}
+.pagepick{display:grid;grid-template-columns:1fr 160px;gap:12px;align-items:end}
+.pagepick .thumb{width:160px}
+@media (max-width:520px){.editor{padding-left:14px}.big{font-size:2.2rem}.controls .btn{padding:12px 10px}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><span class="brand-dot" aria-hidden="true"></span>KNotes</div>
+    <select class="lesson-pick" id="lessonPick" aria-label="Pilih materi"></select>
+    <button class="newbtn" id="newMateri">+ Materi</button>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tabTeach" aria-selected="true">Mengajar</button>
+      <button class="tab" role="tab" id="tabPlan" aria-selected="false">Rencana</button>
+    </div>
+  </div>
+</header>
+<div class="banner" id="banner" hidden></div>
+<main id="main"></main>
+<div class="controls" id="controls"></div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2,10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function mmss(sec, signed){
+  const neg = sec < 0; sec = Math.round(Math.abs(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return (signed ? (neg?'−':'+') : (neg?'−':'')) + m + ':' + String(s).padStart(2,'0');
+}
+function clockAdd(hhmm, sec){
+  const [h,m] = (hhmm||'00:00').split(':').map(Number);
+  const t = new Date(2000,0,1,h||0,m||0,0); t.setSeconds(t.getSeconds()+Math.round(sec));
+  return String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+}
+function wallAdd(ms, sec){ const t=new Date(ms+sec*1000); return String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'); }
+function parseScript(txt){
+  return String(txt||'').split(/\n\s*\n/).map(b=>b.trim()).filter(Boolean).map(b=>{
+    const ls=b.split('\n'); return {en:ls[0], id:ls.slice(1).join(' ')};
+  });
+}
+const mkLines = arr => arr.map(p=>({k:uid(), en:p.en||'', id:p.id||''}));
+const sl = (title, min, kids, script, notes='') => ({id:uid(), title, sec:Math.round(min*60), kids, lines:mkLines(parseScript(script.trim())), notes:notes.trim()});
+
+/* ---------- dialogs (confirm/alert diblokir di sebagian browser/iframe) ---------- */
+function modal(inner, focusSel){
+  return new Promise(res=>{
+    const b=document.createElement('div'); b.className='dlg-back';
+    b.innerHTML=`<div class="dlg" role="dialog" aria-modal="true">${inner}</div>`;
+    document.body.appendChild(b);
+    const done=v=>{ b.remove(); document.removeEventListener('keydown',kd,true); res(v); };
+    const kd=e=>{ if(e.key==='Escape'){ e.stopPropagation(); done(null); } };
+    document.addEventListener('keydown',kd,true);
+    b.addEventListener('click',e=>{ const t=e.target.closest('[data-v]'); if(t) done(t.dataset.v); else if(e.target===b) done(null); });
+    const f=b.querySelector(focusSel||'[data-v="1"]'); f&&f.focus();
+  });
+}
+async function ask(msg,{ok='Ya',cancel='Batal',danger=false}={}){
+  const v=await modal(`<p>${esc(msg)}</p><div class="dlg-actions">${cancel?`<button class="btn" data-v="0">${esc(cancel)}</button>`:''}<button class="btn ${danger?'dangerfill':'primary'}" data-v="1">${esc(ok)}</button></div>`);
+  return v==='1';
+}
+const notify=msg=>ask(msg,{ok:'Oke',cancel:''});
+function choose(title,opts){
+  return modal(`<h3>${esc(title)}</h3><div class="choice">${opts.map(o=>`<button data-v="${o.v}"><b>${esc(o.t)}</b><span>${esc(o.d)}</span></button>`).join('')}</div><div class="dlg-actions"><button class="btn" data-v="">Batal</button></div>`,'.choice button');
+}
+let toastT=null;
+function toast(msg){
+  let t=$('#toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+  t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; },3200);
+}
+
+/* ---------- slide images (IndexedDB cache + Firebase/akun Claude) ---------- */
+const PDF_HINT='Untuk gambar slide, pakai file PDF. Dari PowerPoint: File → Save As → PDF. Dari Canva/Google Slides: Download → PDF.';
+const IMG={mem:{},pend:{},dbp:null};
+let imgDocFn=null; // k -> remote doc ref
+function idbOpen(){
+  if(IMG.dbp) return IMG.dbp;
+  return IMG.dbp=new Promise(res=>{ try{ const r=indexedDB.open('jamNgajarImg',1); r.onupgradeneeded=()=>r.result.createObjectStore('img'); r.onsuccess=()=>res(r.result); r.onerror=()=>res(null); }catch(e){ res(null); } });
+}
+async function idbDo(mode,fn){ const d=await idbOpen(); if(!d) return null; return new Promise(res=>{ try{ const q=fn(d.transaction('img',mode).objectStore('img')); q.onsuccess=()=>res(q.result??null); q.onerror=()=>res(null); }catch(e){ res(null); } }); }
+const imgKey=(deck,page)=>deck+'_'+page;
+function imgGet(deck,page){
+  const k=imgKey(deck,page);
+  if(IMG.mem[k]) return Promise.resolve(IMG.mem[k]);
+  if(IMG.pend[k]) return IMG.pend[k];
+  return IMG.pend[k]=(async()=>{
+    let v=await idbDo('readonly',s=>s.get(k));
+    if(!v && imgDocFn){ try{ const sn=await imgDocFn(k).get(); if(sn.exists){ v=(sn.data()||{}).img||null; if(v) idbDo('readwrite',s=>s.put(v,k)); } }catch(e){ console.warn(e); } }
+    if(v) IMG.mem[k]=v;
+    delete IMG.pend[k]; return v;
+  })();
+}
+async function imgPut(deck,page,v){
+  const k=imgKey(deck,page); IMG.mem[k]=v;
+  await idbDo('readwrite',s=>s.put(v,k));
+  if(imgDocFn){ try{ await imgDocFn(k).set({img:v,deck,page}); return true; }catch(e){ console.warn(e); return false; } }
+  return true;
+}
+async function saveDeckImgs(deckId,D,onStep){
+  let fail=0; const list=D.filter(s=>s.img);
+  for(let i=0;i<list.length;i++){ onStep&&onStep(i+1,list.length); if(!await imgPut(deckId,list[i].n,list[i].img)) fail++; }
+  return fail;
+}
+function dropDeck(deck){
+  if(!deck || state.lessons.some(l=>l.deck&&l.deck.id===deck.id)) return;
+  for(let p=1;p<=deck.pages;p++){ const k=imgKey(deck.id,p); delete IMG.mem[k]; idbDo('readwrite',s=>s.delete(k)); if(imgDocFn){ try{ imgDocFn(k).delete().catch(()=>{}); }catch(e){} } }
+}
+function encodeCanvas(cv){
+  const LIM=230000; let q=0.72, u=cv.toDataURL('image/jpeg',q);
+  while(u.length>LIM && q>0.35){ q-=0.1; u=cv.toDataURL('image/jpeg',q); }
+  if(u.length>LIM){ const c2=document.createElement('canvas'); c2.width=Math.round(cv.width*0.7); c2.height=Math.round(cv.height*0.7); c2.getContext('2d').drawImage(cv,0,0,c2.width,c2.height); u=c2.toDataURL('image/jpeg',0.55); }
+  return u;
+}
+function thumbHtml(L,s){ if(!L.deck) return '<span></span>'; return s.page? `<span class="thumb" data-deck="${L.deck.id}" data-page="${s.page}">${s.page}</span>` : '<span class="thumb">—</span>'; }
+function slideViewHtml(L,s){
+  if(!L.deck) return `<section class="panel slideview"><div class="frame">Lampirkan file slide (PDF) di tab Rencana<br>supaya slide tiap tahapan tampil di sini.</div></section>`;
+  if(!s.page) return `<section class="panel slideview"><div class="frame">Tahapan ini tidak memakai slide.</div></section>`;
+  return `<section class="panel slideview"><div class="frame" data-deck="${L.deck.id}" data-page="${s.page}">Memuat slide…</div><div class="cap"><span>Tampilkan di layar: <b>slide ${s.page}</b></span><span>dari ${L.deck.pages} slide</span></div></section>`;
+}
+function fillImgs(root){
+  (root||document).querySelectorAll('[data-deck][data-page]:not([data-filled])').forEach(async el=>{
+    el.setAttribute('data-filled','1');
+    const src=await imgGet(el.dataset.deck,+el.dataset.page);
+    if(!el.isConnected) return;
+    if(src){ const im=new Image(); im.alt='Slide '+el.dataset.page; im.src=src; el.textContent=''; el.appendChild(im); }
+    else { el.removeAttribute('data-filled'); if(!el.classList.contains('thumb')) el.textContent='Gambar slide '+el.dataset.page+' belum tersedia di perangkat ini.'; }
+  });
+}
+
+/* ---------- seed lesson ---------- */
+function seedLesson(){
+  return { id:uid(), title:'A Rainy Day — High School', classMin:60, startClock:'19:00', lastActual:null, slides:[
+  sl('Pembuka & perkenalan (cover)',1,0,`
+Hello everyone, nice to meet you all! How are you today? I hope you're having a great day.
+Halo semuanya, senang ketemu kalian semua! Apa kabar hari ini? Semoga harinya menyenangkan ya.
+
+First, let me introduce myself. My name is Agung, and today we will learn about a rainy day.
+Pertama-tama, kenalin nama aku Agung, dan hari ini kita akan belajar tentang hari hujan.`),
+  sl("Today's Topic — Rainy day + dialog Naoko & Jiro",3,2,`
+How do you say this word? Rainy day. Repeat after me: rainy day.
+Gimana cara bacanya? "Rainy day", dibaca "rei-ni dei". Ikutin aku ya: rainy day.
+
+A rainy day is a day when it rains.
+Rainy day artinya hari ketika turun hujan, atau "hari hujan".
+
+Now we have a conversation between Naoko and Jiro. Who wants to be Naoko, and who wants to be Jiro?
+Sekarang ada percakapan antara Naoko dan Jiro. Siapa yang mau jadi Naoko, siapa yang mau jadi Jiro?
+
+Awesome! Thank you, ... and ...
+Keren! Makasih ya, ... dan ...`,`
+Arti dialog — Naoko: Aku suka hari hujan, rasanya santai banget. Jiro: Oh ya? Aku biasanya lebih suka cuaca cerah.`),
+  sl('Warm-up — raincoat atau umbrella?',3,3,`
+Now a warm-up question. Which one do you use on rainy days, a raincoat or an umbrella? Why?
+Sekarang pertanyaan pemanasan. Kalau hujan kamu pakai jas hujan atau payung? Kenapa?
+
+For example: "I use an umbrella because it's simple." I will ask, and you answer, okay?
+Contohnya: "Aku pakai payung karena simpel." Aku yang tanya, kamu yang jawab ya.
+
+Great answer, thank you!
+Jawabannya bagus, makasih ya!`),
+  sl('Visual Vocabulary — drizzle, puddle, lightning, rain boots',5,4,`
+Here we have four new words. Let's say them clearly and carefully, okay?
+Kita punya empat kosakata baru. Kita ucapkan dengan jelas dan hati-hati ya.
+
+Number one: drizzle. Drizzle means light rain. Repeat after me.
+Nomor satu: drizzle, dibaca "dri-zel", artinya gerimis. Ikutin aku ya.
+
+Number two: puddle. Say it for me.
+Nomor dua: puddle, dibaca "pa-del" (bukan "pu-dle"), artinya genangan air. Coba ucapkan.
+
+Number three: lightning. One, two, three, go!
+Nomor tiga: lightning, dibaca "lait-ning", artinya kilat. Satu, dua, tiga, mulai!
+
+Number four: rain boots. The last one, say it for me.
+Nomor empat: rain boots, dibaca "rein buuts", artinya sepatu bot hujan. Yang terakhir, coba ucapkan.`,`
+1 anak per kata, lalu seluruh kelas ulangi bareng.`),
+  sl('Vocabulary in Context — cerita Umi & Shun (8 kalimat)',12,8,`
+Now we have eight words in the table. Let's read the words first, then the story, one sentence at a time.
+Ada delapan kosakata di tabel. Kita baca kosakatanya dulu, lalu ceritanya satu kalimat satu kalimat.
+
+Notice, walk, ask, join, and reach are verbs. Slippery is an adjective. "Get heavier" is a verb phrase.
+Notice, walk, ask, join, reach itu kata kerja. Slippery itu kata sifat. "Get heavier" itu frasa kerja.
+
+Who wants to read sentence number one?
+Siapa yang mau baca kalimat nomor satu?
+
+Good! Can you tell me what it means in Indonesian?
+Bagus! Coba, artinya apa dalam bahasa Indonesia?`,`
+Arti tiap kalimat:
+[1] Umi melihat Shun berjalan sendirian sepulang sekolah.
+[2] Dia sedang menuntun sepedanya ketika mulai gerimis.
+[3] Shun biasanya naik sepeda pulang, tapi jalannya sangat basah dan licin.
+[4] Umi merasa kasihan melihat dia berjalan sendirian di tengah hujan.
+[5] Umi punya satu payung, jadi dia mengajak Shun berjalan bersamanya.
+[6] Lalu Shun bergabung, dan mereka berjalan pelan-pelan.
+[7] Hujannya makin deras, jadi mereka berjalan dengan hati-hati.
+[8] Saat pulang hujannya berhenti, dan akhirnya mereka sampai di rumah.
+Kalau waktu mepet: 1 anak baca 2 kalimat (jadi 4 anak).`),
+  sl('Listening for Details — 2 pertanyaan',1,0,`
+Now we will listen to a conversation. Listen carefully, then answer two questions.
+Sekarang kita akan mendengarkan percakapan. Dengarkan baik-baik, lalu jawab dua pertanyaan.
+
+Question one: What is the weather like outside? Question two: What should Sarah wear?
+Pertanyaan satu: Cuaca di luar seperti apa? Pertanyaan dua: Sarah sebaiknya pakai apa?`),
+  sl('Listening — putar video English Together',5,2,`
+Okay, let's watch. Please listen carefully.
+Oke, kita tonton ya. Dengarkan baik-baik.
+
+So, what is the weather like outside?
+Jadi, cuaca di luar seperti apa?
+
+And what should Sarah wear?
+Terus, Sarah sebaiknya pakai apa?`,`
+Cek durasi video sebelum kelas, lalu sesuaikan durasi slide ini di tab Rencana.
+Jawaban (dari dialog slide berikutnya): hujan, dingin, dan berangin. Sarah sebaiknya pakai jaket tebal, jas hujan, dan sepatu bot.`),
+  sl('Complete and Read the Dialogue — Tom & Sarah',7,5,`
+Now let's complete the dialogue. Who wants to be Tom, and who wants to be Sarah?
+Sekarang kita lengkapi dialognya. Siapa yang mau jadi Tom, siapa yang mau jadi Sarah?
+
+What's the answer for number one? Anyone?
+Jawaban nomor satu apa? Ada yang tahu?
+
+Great! Now let's read the whole dialogue together.
+Bagus! Sekarang kita baca dialognya dari awal.`,`
+2 anak baca peran Tom & Sarah; 5 anak lain isi titik-titik (1 anak per nomor).
+Perkiraan kunci — cocokkan dulu dengan video: [1] dark/cloudy, [2] slippery, [3] warm, [4] closet, [5] raincoat.`),
+  sl('True or False — 3 pernyataan',3,3,`
+Read each sentence and decide: is it true or false?
+Baca setiap kalimat, lalu tentukan: benar atau salah?
+
+Number one. True or false? Why?
+Nomor satu. Benar atau salah? Kenapa?`,`
+Perkiraan kunci (cek dengan dialog):
+1. False — cuacanya hujan, dingin, dan berangin.
+2. True — Sarah sempat tanya apakah kaos boleh dipakai (bisa diperdebatkan, jadikan bahan diskusi).
+3. False — Tom menyarankan jaket; jas hujan itu ide Sarah.`),
+  sl('Presentation Time — 6 pertanyaan',10,6,`
+It's presentation time! I will ask a question, and you answer in English. Take your time.
+Saatnya presentasi! Aku kasih pertanyaan, kamu jawab dalam bahasa Inggris. Santai aja.
+
+What do you usually do on a rainy day?
+Biasanya kamu ngapain kalau hari hujan?
+
+Tell us about a time when rain changed your plans.
+Ceritain pengalaman waktu hujan bikin rencanamu berubah.
+
+If it starts raining on your way somewhere, would you keep going or wait for the rain to stop?
+Kalau hujan turun waktu kamu lagi di jalan, kamu lanjut jalan atau nunggu hujan reda?
+
+"Rainy days are perfect for staying home." Do you agree?
+Setuju nggak kalau hari hujan paling pas buat di rumah aja?
+
+You planned to hang out with friends, but it starts raining. What will you do?
+Kamu udah janjian main sama teman, tapi tiba-tiba hujan. Kamu bakal ngapain?
+
+What is your best tip for enjoying a rainy day?
+Apa tips terbaikmu biar tetap menikmati hari hujan?`,`
+1 pertanyaan per anak, sekitar 1,5 menit per anak.`),
+  sl('Quote of the Day',2,1,`
+Now, the quote of the day. Can someone read it for us?
+Sekarang kutipan hari ini. Ada yang mau bacain?
+
+What do you think it means?
+Menurut kamu maknanya apa?`,`
+Makna singkat: jangan cuma menunggu masalah selesai, belajarlah tetap bahagia di tengah kesulitan.`),
+  sl('Closing — recap & foto',5,2,`
+Okay everyone, let's recap. What did we learn today?
+Oke semuanya, kita rekap ya. Tadi kita belajar apa aja?
+
+What new words did we learn? Drizzle, puddle, lightning...
+Kosakata apa aja yang udah kita pelajari? Drizzle, puddle, lightning...
+
+Before we close, please turn on your camera and give your best pose for a photo! One, two, three!
+Sebelum ditutup, nyalakan kamera dan gaya semenarik mungkin buat foto ya! Satu, dua, tiga!
+
+Thank you, everyone. See you next time. Bye-bye!
+Makasih semuanya, sampai ketemu lagi. Dadah!`)
+  ]};
+}
+function blankLesson(){
+  return {id:uid(), title:'Materi baru', classMin:60, startClock:'19:00', lastActual:null, slides:[
+    sl('Pembuka',1,0,'Hello everyone, nice to meet you all!\nHalo semuanya, senang ketemu kalian semua!'),
+    sl('Closing',5,2,"Okay everyone, let's recap. What did we learn today?\nOke semuanya, kita rekap ya. Tadi kita belajar apa aja?")
+  ]};
+}
+
+/* ---------- storage ---------- */
+const KEY='jamNgajar.v1', RKEY='jamNgajar.run.v1';
+function load(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function store(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function migrate(st){
+  st.lessons.forEach(L=>L.slides.forEach(s=>{
+    if(!Array.isArray(s.lines)){ s.lines=mkLines(parseScript(s.script)); delete s.script; }
+    s.lines.forEach(p=>{ if(!p.k) p.k=uid(); });
+  }));
+  st.settings = Object.assign({teacher:'Agung', level:'SMA', students:8}, st.settings||{});
+  return st;
+}
+let state = load(KEY);
+if(!state || !Array.isArray(state.lessons) || !state.lessons.length){
+  const l=seedLesson(); state={lessons:[l], activeId:l.id, updatedAt:0};
+}
+state = migrate(state);
+let run = load(RKEY);
+let view = 'teach', openSlide = null, importOpen = false;
+let syncLabel = 'Menghubungkan ke Firebase…';
+
+function lesson(){ return state.lessons.find(l=>l.id===state.activeId) || state.lessons[0]; }
+function save(){ state.updatedAt=Date.now(); store(KEY,state); schedulePush(); }
+function saveRun(){ store(RKEY,run); }
+
+/* ===================== ISI KONFIGURASI FIREBASE DI SINI ===================== */
+/* Tempel firebaseConfig dari Firebase Console (boleh sama dengan project KPlan). */
+const firebaseConfig = {
+  apiKey: "AIzaSyBAmpldl80rbtj5tBjqwHenIY6ZxZlbLgU",
+  authDomain: "knotes-1686a.firebaseapp.com",
+  projectId: "knotes-1686a",
+  storageBucket: "knotes-1686a.firebasestorage.app",
+  messagingSenderId: "505141505896",
+  appId: "1:505141505896:web:e84699c67ea9330dffb0dd"
+};
+/* ============================================================================ */
+const FS_COLLECTION='jamngajar_kv', FS_DOC='state';
+let syncName='Firebase', fsRef=null, fsBusy=false, fsAgain=false, pushTimer=null, pendingRemote=null;
+let sampleFn=null, sampleImages=false;
+const clientId=uid();
+function showBanner(t){ const b=$('#banner'); if(b){ b.textContent=t; b.hidden=false; } }
+function schedulePush(){ clearTimeout(pushTimer); pushTimer=setTimeout(pushRemote,800); }
+async function pushRemote(){
+  if(!fsRef) return;
+  if(fsBusy){ fsAgain=true; return; }
+  fsBusy=true;
+  try{ await fsRef.set({json:JSON.stringify(state), updatedAt:state.updatedAt||Date.now(), by:clientId}); syncLabel='Tersimpan di '+syncName; }
+  catch(e){ console.warn(e); syncLabel='Tersimpan di perangkat ini saja (gagal simpan ke '+syncName+')'; }
+  fsBusy=false; updateFoot();
+  if(fsAgain){ fsAgain=false; setTimeout(pushRemote,600); }
+}
+function applyRemote(d){
+  try{
+    const p=JSON.parse(d.json);
+    if(p && Array.isArray(p.lessons) && p.lessons.length){
+      state=migrate(p); store(KEY,state);
+      if(!state.lessons.find(l=>l.id===run.lessonId)){ run=freshRun(); saveRun(); }
+      render();
+    }
+  }catch(e){ console.warn(e); }
+}
+function isEditing(){ const a=document.activeElement; return !!a && ['INPUT','TEXTAREA','SELECT'].includes(a.tagName); }
+document.addEventListener('focusout',()=>setTimeout(()=>{ if(pendingRemote && !isEditing()){ const d=pendingRemote; pendingRemote=null; applyRemote(d); } },0));
+function initFirebase(){
+  try{
+    if(typeof firebase==='undefined') throw new Error('Firebase SDK tidak termuat');
+    if(!firebaseConfig.projectId) throw new Error('firebaseConfig belum diisi');
+    firebase.initializeApp(firebaseConfig);
+    const fsDb=firebase.firestore();
+    fsRef=fsDb.collection(FS_COLLECTION).doc(FS_DOC);
+    imgDocFn=k=>fsDb.collection('jamngajar_slides').doc(k);
+    let first=true;
+    fsRef.onSnapshot(snap=>{
+      if(!snap.exists){ if(first){ first=false; pushRemote(); } return; }
+      const d=snap.data()||{};
+      if(first){ first=false; if((d.updatedAt||0)<(state.updatedAt||0)) pushRemote(); }
+      syncLabel='Tersimpan di Firebase'; updateFoot();
+      if(d.by===clientId || !d.json || (d.updatedAt||0)<=(state.updatedAt||0)) return;
+      if(isEditing()) pendingRemote=d; else applyRemote(d);
+    }, err=>{
+      console.warn(err); fsRef=null;
+      syncLabel='Tersimpan di perangkat ini saja (Firebase menolak akses, cek Rules)'; updateFoot();
+      showBanner('Tidak bisa terhubung ke Firebase. Data tetap tersimpan di browser ini.');
+    });
+  }catch(e){
+    fsRef=null; syncLabel='Tersimpan di browser ini'; updateFoot();
+    initClaudeSync().then(ok=>{ if(!ok){ syncLabel='Mode pratinjau, data tersimpan di browser ini saja'; updateFoot(); showBanner('Mode pratinjau: Firebase belum terhubung, jadi data hanya tersimpan di browser ini.'); } });
+  }
+}
+async function initClaudeSync(){
+  if(!window.claude || typeof window.claude.use!=='function') return false;
+  try{
+    const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    if(!db||!user) return false;
+    const id=await user.id(); if(!id) return false;
+    const col=db.collection('data/users/'+id), ref=col.doc('jamNgajar');
+    const snap=await ref.get();
+    syncName='akun Claude'; fsRef=ref; imgDocFn=k=>col.doc('img_'+k);
+    const d=snap.exists? (snap.data()||{}) : null;
+    if(d && d.json && (d.updatedAt||0)>(state.updatedAt||0)) applyRemote(d);
+    else if(!d || (d.updatedAt||0)<(state.updatedAt||0)) pushRemote();
+    syncLabel='Tersimpan di akun Claude'; updateFoot(); fillImgs();
+    return true;
+  }catch(e){ console.warn(e); return false; }
+}
+/* Claude (hanya kalau dibuka dari claude.ai) */
+(async()=>{
+  if(!window.claude || typeof window.claude.use!=='function') return;
+  try{
+    const s=await window.claude.use('sample');
+    if(s){ sampleFn=s; try{ const lim=await s.limits(); sampleImages=!!(lim&&lim.images); }catch(e){} if(view==='plan') renderPlan(); }
+  }catch(e){}
+})();
+function aiError(e){
+  const c=e&&e.code;
+  if(c==='not_granted') return 'Izin memakai Claude ditolak. Muat ulang halaman untuk mengizinkan lagi.';
+  if(c==='rate_limited') return 'Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.';
+  if(c==='cancelled') return 'Dibatalkan.';
+  if(c==='quota') return 'Kuota terjemahan gratis hari ini habis. Isi manual dulu, besok bisa lagi.';
+  if(c==='offline') return 'Tidak ada koneksi internet.';
+  return 'Gagal menghubungi Claude'+(c?` (${c})`:'')+'. Coba lagi.';
+}
+
+/* ---------- auto translate (EN -> ID) ---------- */
+const tState={}; // k -> 'busy' | 'err' | 'ok'
+const tTimers={}, tCtl={};
+let tActive=0; const tQueue=[];
+function findPair(k){ for(const L of state.lessons) for(const s of L.slides){ const p=s.lines.find(x=>x.k===k); if(p) return p; } return null; }
+function queueTranslate(k, delay){
+  clearTimeout(tTimers[k]);
+  tTimers[k]=setTimeout(()=>{ if(tCtl[k]) tCtl[k].abort(); tQueue.push(k); pumpT(); }, delay);
+}
+function pumpT(){
+  while(tActive<2 && tQueue.length){
+    const k=tQueue.shift(); const p=findPair(k); if(!p || !p.en.trim()) continue;
+    tActive++; doTranslate(k,p).finally(()=>{ tActive--; pumpT(); });
+  }
+}
+async function doTranslate(k,p){
+  const en=p.en.trim(); const ctl=new AbortController(); tCtl[k]=ctl;
+  tState[k]='busy'; paintT(k);
+  const L=lesson();
+  try{
+    let text;
+    if(!sampleFn){ text=await mmTranslate(en, ctl.signal); } else {
+    ({text}=await sampleFn(
+`Terjemahkan kalimat bahasa Inggris berikut ke bahasa Indonesia lisan yang natural, ramah, dan santai-sopan, seperti guru les online yang bicara ke murid ${state.settings.level||'SMP/SMA'} (pakai "kamu", boleh "ya", "yuk", "nih"). Kalau kalimatnya membahas sebuah kosakata bahasa Inggris, biarkan kosakata itu tetap dalam bahasa Inggris dan tambahkan cara bacanya dalam tanda kutip bila membantu. Nama orang tetap. Topik kelas: "${L.title}".
+Balas HANYA dengan terjemahannya, tanpa tanda kutip pembuka, tanpa catatan.
+
+Kalimat: ${en}`, {modelTier:'quick', signal:ctl.signal}));
+    }
+    const cur=findPair(k);
+    if(cur && cur.en.trim()===en){ cur.id=text.trim().replace(/^["“]|["”]$/g,''); save(); tState[k]='ok'; const ta=document.querySelector(`.pid[data-k="${k}"]`); if(ta) ta.value=cur.id; }
+    else tState[k]=null;
+  }catch(e){ if(e&&e.code==='cancelled'){ tState[k]=null; } else { tState[k]='err:'+aiError(e); } }
+  if(tCtl[k]===ctl) delete tCtl[k];
+  paintT(k);
+}
+function decodeHtml(s){ const t=document.createElement('textarea'); t.innerHTML=s; return t.value; }
+async function mmTranslate(en, signal){
+  let r;
+  try{ r=await fetch('https://api.mymemory.translated.net/get?langpair=en|id&q='+encodeURIComponent(en.slice(0,480)),{signal}); }
+  catch(e){ if(e&&e.name==='AbortError') throw {code:'cancelled'}; throw {code:'offline'}; }
+  if(r.status===429) throw {code:'quota'};
+  if(!r.ok) throw {code:'http_'+r.status};
+  const j=await r.json();
+  const st=String(j.responseStatus);
+  if(st!=='200'){ throw {code:/LIMIT|QUOTA|USED ALL/i.test(j.responseDetails||'')||st==='429'?'quota':'mt_'+st}; }
+  return decodeHtml(j.responseData.translatedText||'');
+}
+function paintT(k){
+  const el=document.querySelector(`.tstat[data-k="${k}"]`); if(!el) return;
+  const st=tState[k]||'';
+  el.className='tstat'; el.disabled=true;
+  if(st==='busy'){ el.classList.add('busy'); el.textContent='Menerjemahkan…'; }
+  else if(st==='ok'){ el.textContent='Diterjemahkan otomatis · boleh diedit'; }
+  else if(st.startsWith('err:')){ el.classList.add('err'); el.disabled=false; el.textContent=st.slice(4)+' Ketuk untuk coba lagi.'; }
+  else el.textContent = 'Terjemahan otomatis muncul setelah kamu selesai mengetik';
+}
+
+/* ---------- run (live class) ---------- */
+function freshRun(){ return {lessonId:lesson().id, idx:0, base:0, segStart:0, running:false, startedWall:null, enter:{0:0}, actual:{}, kids:{}, done:false}; }
+if(!run || run.lessonId!==lesson().id) run=freshRun();
+function elapsed(){ return run.base + (run.running ? (Date.now()-run.segStart)/1000 : 0); }
+function plannedStarts(L){ const a=[]; let t=0; L.slides.forEach(s=>{a.push(t); t+=s.sec;}); return {starts:a,total:t}; }
+function startPause(){
+  if(run.done) return;
+  if(run.running){ run.base=elapsed(); run.running=false; releaseWake(); }
+  else { run.segStart=Date.now(); run.running=true; if(!run.startedWall) run.startedWall=Date.now()-run.base*1000; askWake(); }
+  saveRun(); renderControls(); tick();
+}
+function leaveSlide(){
+  const L=lesson(), s=L.slides[run.idx]; if(!s) return;
+  const E=elapsed(), ent=run.enter[run.idx] ?? E;
+  run.actual[s.id]=(run.actual[s.id]||0)+(E-ent);
+}
+function go(delta){
+  const L=lesson();
+  if(run.done && delta<0){ run.done=false; run.idx=L.slides.length-1; run.enter[run.idx]=elapsed(); saveRun(); renderTeach(); return; }
+  if(run.done) return;
+  const ni=run.idx+delta;
+  if(ni<0) return;
+  leaveSlide();
+  if(ni>=L.slides.length){
+    run.base=elapsed(); run.running=false; run.done=true; releaseWake();
+    L.lastActual={...run.actual, _total:run.base}; save();
+  } else { run.idx=ni; run.enter[ni]=elapsed(); }
+  saveRun(); renderTeach(); window.scrollTo({top:0});
+}
+async function resetRun(){
+  if(run.base>0||run.running||run.idx>0){
+    if(!await ask('Ulang kelas dari awal? Timer kembali ke 0:00 dan tanda anak yang sudah menjawab dikosongkan.',{ok:'Ulang dari awal',danger:true})) return;
+  }
+  releaseWake(); run=freshRun(); saveRun(); renderTeach(); window.scrollTo({top:0});
+  toast('Kelas diulang. Tekan "Mulai kelas" saat siap.');
+}
+let wake=null;
+async function askWake(){ try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){} }
+function releaseWake(){ try{ wake && wake.release(); }catch(e){} wake=null; }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && run.running) askWake(); });
+
+/* ---------- the hour bar ---------- */
+function hourBar(L, live){
+  const {starts,total}=plannedStarts(L), cls=L.classMin*60, scale=Math.max(total,cls)||1;
+  let segs='';
+  L.slides.forEach((s,i)=>{
+    const w=s.sec/scale*100, over=starts[i]+s.sec>cls+0.5;
+    let c='seg'; if(live && !run.done){ if(i<run.idx) c+=' past'; else if(i===run.idx) c+=' cur'; } else if(live && run.done) c+=' past';
+    if(over && !(live && (i<=run.idx))) c+=' over';
+    segs+=`<div class="${c}" style="width:${w}%" title="${esc(s.title)}">${w>3?i+1:''}</div>`;
+  });
+  const endPos=cls/scale*100;
+  let scaleHtml=''; for(let m=0;m<=L.classMin;m+=15){ scaleHtml+=`<span style="left:${(m*60)/scale*100}%">${m}′</span>`; }
+  return `<div class="hour" aria-label="Rencana satu jam">
+    <div class="hour-track">${segs}${endPos<100?`<div class="class-end" style="left:${endPos}%" title="Kelas berakhir"></div>`:''}<div class="needle" id="needle"></div></div>
+    <div class="hour-scale">${scaleHtml}</div></div>`;
+}
+
+/* ---------- render: teach ---------- */
+function renderTeach(){
+  const L=lesson(); const m=$('#main');
+  if(run.done){ m.innerHTML=hourBar(L,true)+recapHtml(L); renderControls(); tick(); updateFoot(); return; }
+  const s=L.slides[run.idx]; const nxt=L.slides[run.idx+1];
+  const lines=s.lines.filter(l=>l.en.trim()||l.id.trim());
+  const kidsDone=run.kids[s.id]||0;
+  let dots=''; for(let i=0;i<s.kids;i++) dots+=`<button class="dot" data-k="${i}" aria-pressed="${i<kidsDone}" aria-label="Anak ke-${i+1}">${i+1}</button>`;
+  m.innerHTML = hourBar(L,true) + `
+  <div class="teach">
+    <div class="side">
+      <section class="panel">
+        <div class="slide-no">Tahap ${run.idx+1} dari ${L.slides.length}${L.deck&&s.page?` · slide ${s.page}`:''}</div>
+        <div class="slide-title">${esc(s.title)}</div>
+        <div class="timers">
+          <div class="timer"><div class="big num" id="elapsed">0:00</div><div class="big-label">waktu berjalan<br>dari ${L.classMin}:00</div></div>
+          <div class="timer slide"><div class="big num" id="remain">${mmss(s.sec)}</div><div class="big-label" id="remainLbl">sisa waktu<br>tahap ini</div></div>
+        </div>
+        <div id="chip" class="chip idle">Siap mulai</div>
+        <div class="facts">
+          <div><span>Target selesai tahap</span><b class="num" id="target">—</b></div>
+          <div><span>Perkiraan kelas selesai</span><b class="num" id="proj">—</b></div>
+          <div><span>Durasi tahap</span><b class="num">${mmss(s.sec)}</b></div>
+          <div><span>Sisa kelas</span><b class="num" id="classLeft">—</b></div>
+        </div>
+        <div class="kids">
+          <div class="kids-head">Tanya ${s.kids} anak <small id="kidsCount">${kidsDone}/${s.kids}</small></div>
+          ${s.kids? `<div class="dots" id="dots">${dots}</div>` : `<div class="nokids">Tahap ini tidak perlu jawaban anak.</div>`}
+        </div>
+      </section>
+    </div>
+    <div>
+      ${slideViewHtml(L,s)}
+      <section class="panel script">
+        <h3>Naskah — ucapkan bahasa Inggris dulu, lalu bahasa Indonesia</h3>
+        ${lines.length? lines.map(l=>`<div class="line"><div class="en"><span class="lang e">EN</span>${esc(l.en)}</div>${l.id?`<div class="id"><span class="lang i">ID</span>${esc(l.id)}</div>`:''}</div>`).join('') : '<p class="id">Belum ada naskah. Tambahkan di tab Rencana.</p>'}
+      </section>
+      ${s.notes?`<section class="panel notes"><h3>Catatan & kunci jawaban</h3><p>${esc(s.notes)}</p></section>`:''}
+      <div class="next">${nxt?`${L.deck?thumbHtml(L,nxt):''}<span>Berikutnya: <b>${esc(nxt.title)}</b> · ${mmss(nxt.sec)} · ${nxt.kids} anak${L.deck&&nxt.page?` · slide ${nxt.page}`:''}</span>`:'<span>Ini tahap terakhir. Tekan <b>Selesai</b> setelah menutup kelas.</span>'}</div>
+    </div>
+  </div>
+  <p class="foot" id="foot"></p>`;
+  const d=$('#dots');
+  if(d) d.addEventListener('click',e=>{
+    const b=e.target.closest('.dot'); if(!b) return;
+    const k=+b.dataset.k, cur=run.kids[s.id]||0;
+    run.kids[s.id] = (cur===k+1)? k : k+1; saveRun();
+    d.querySelectorAll('.dot').forEach((x,i)=>x.setAttribute('aria-pressed', i<run.kids[s.id]));
+    $('#kidsCount').textContent=`${run.kids[s.id]}/${s.kids}`;
+  });
+  renderControls(); tick(); updateFoot(); fillImgs();
+}
+function recapHtml(L){
+  const act=run.actual; let rows='', tp=0, ta=0;
+  L.slides.forEach((s,i)=>{ const a=act[s.id]||0, d=a-s.sec; tp+=s.sec; ta+=a;
+    rows+=`<tr><td>${i+1}. ${esc(s.title)}</td><td class="r num">${mmss(s.sec)}</td><td class="r num">${mmss(a)}</td><td class="r num ${Math.abs(d)<15?'':(d>0?'plus':'minus')}">${Math.abs(d)<15?'pas':mmss(d,true)}</td></tr>`; });
+  const cls=L.classMin*60, over=ta-cls;
+  return `<section class="panel recap">
+    <div class="slide-title">Kelas selesai di menit ${mmss(ta)}</div>
+    <p class="id">${over>0?`Lewat ${mmss(over)} dari ${L.classMin} menit.`:`Masih sisa ${mmss(-over)} dari ${L.classMin} menit.`} Merah = lebih lama dari rencana, hijau = lebih cepat. Pakai ini untuk merapikan durasi di tab Rencana.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Tahap</th><th class="r">Rencana</th><th class="r">Aktual</th><th class="r">Selisih</th></tr></thead>
+    <tbody>${rows}<tr><th>Total</th><th class="r num">${mmss(tp)}</th><th class="r num">${mmss(ta)}</th><th class="r num">${mmss(ta-tp,true)}</th></tr></tbody></table></div>
+  </section><p class="foot" id="foot"></p>`;
+}
+function renderControls(){
+  const c=$('#controls');
+  if(view!=='teach'){ c.style.display='none'; return; }
+  c.style.display='';
+  const L=lesson(), last=run.idx===L.slides.length-1;
+  if(run.done){
+    c.innerHTML=`<div class="controls-in"><button class="btn" id="bPrev">Kembali</button><button class="btn primary" id="bReset">Mulai kelas baru</button></div>`;
+    $('#bPrev').onclick=()=>go(-1); $('#bReset').onclick=()=>{ run=freshRun(); saveRun(); renderTeach(); };
+    return;
+  }
+  c.innerHTML=`<div class="controls-in">
+    <button class="btn" id="bPrev" ${run.idx===0?'disabled':''} aria-label="Tahap sebelumnya">◀</button>
+    <button class="btn ${run.running?'':'primary'}" id="bPlay">${run.running?'Jeda':(run.base>0?'Lanjut':'Mulai kelas')}</button>
+    <button class="btn ${run.running?'primary':''} go" id="bNext">${last?'Selesai':'Tahap berikutnya ▶'}</button>
+    <button class="btn ghost" id="bReset" title="Ulang dari awal">Ulang</button>
+  </div>`;
+  $('#bPrev').onclick=()=>go(-1); $('#bNext').onclick=()=>{ if(!run.running && run.base===0) startPause(); go(1); };
+  $('#bPlay').onclick=startPause; $('#bReset').onclick=resetRun;
+}
+
+/* ---------- tick ---------- */
+function tick(){
+  if(view!=='teach') return;
+  const L=lesson(), {starts,total}=plannedStarts(L), cls=L.classMin*60, scale=Math.max(total,cls)||1;
+  const E=elapsed(), nd=$('#needle');
+  if(nd){ if(E>0||run.running){ nd.style.display='block'; nd.style.left=Math.min(100,E/scale*100)+'%'; } else nd.style.display='none'; }
+  if(run.done || !$('#remain')) return;
+  const s=L.slides[run.idx], ent=run.enter[run.idx] ?? 0, sEl=Math.max(0,E-ent);
+  const remain=s.sec-sEl, drift=(ent-starts[run.idx])+Math.max(0,sEl-s.sec);
+  const r=$('#remain'); r.textContent = remain>=0? mmss(remain) : mmss(remain,true);
+  r.className='big num'+(remain<0?' over':(remain<=60&&(run.running||E>0)?' warn':''));
+  $('#remainLbl').innerHTML = remain<0? 'lewat dari<br>rencana tahap' : 'sisa waktu<br>tahap ini';
+  const el=$('#elapsed'); el.textContent=mmss(E);
+  el.className='big num'+(E>cls?' over':(E>cls-300?' warn':''));
+  const cl=$('#classLeft'); cl.textContent = E<=cls? mmss(cls-E) : 'lewat '+mmss(E-cls);
+  const wallBase = run.startedWall;
+  const endRel = starts[run.idx]+s.sec;
+  $('#target').textContent = `menit ${mmss(endRel)} · ${wallBase? wallAdd(wallBase,endRel) : clockAdd(L.startClock,endRel)}`;
+  const projRel = total+drift;
+  $('#proj').textContent = `${mmss(projRel)} · ${wallBase? wallAdd(wallBase,projRel) : clockAdd(L.startClock,projRel)}`;
+  $('#proj').style.color = projRel>cls+30? 'var(--late)' : '';
+  const chip=$('#chip');
+  if(!run.running && E===0){ chip.className='chip idle'; chip.textContent=`Siap mulai · rencana ${mmss(total)}`; }
+  else if(!run.running){ chip.className='chip idle'; chip.textContent='Dijeda'; }
+  else if(drift>=30){ chip.className='chip late'; chip.textContent=`Telat ${mmss(drift)} — percepat`; }
+  else if(drift<=-30){ chip.className='chip early'; chip.textContent=`Lebih cepat ${mmss(-drift)} — boleh tambah 1 anak`; }
+  else { chip.className='chip ok'; chip.textContent='Tepat waktu'; }
+}
+setInterval(tick,250);
+
+/* ---------- render: plan ---------- */
+function pairsHtml(s){
+  return s.lines.map((p,i)=>`
+    <div class="pair" data-k="${p.k}">
+      <textarea class="pen" data-k="${p.k}" rows="2" placeholder="Kalimat bahasa Inggris (Enter = kalimat baru)" aria-label="Kalimat bahasa Inggris ${i+1}">${esc(p.en)}</textarea>
+      <button class="x" data-del="${p.k}" aria-label="Hapus kalimat ${i+1}" title="Hapus kalimat">×</button>
+      <div class="pid-row">
+        <textarea class="pid" data-k="${p.k}" rows="2" placeholder="Terjemahan bahasa Indonesia" aria-label="Terjemahan ${i+1}">${esc(p.id)}</textarea>
+        <button class="tstat" data-k="${p.k}" disabled></button>
+      </div>
+    </div>`).join('');
+}
+function importHtml(){
+  const st=state.settings;
+  return `<section class="panel import ${importOpen?'open':''}" id="imp">
+    <div class="import-top">
+      <div><h2>Buat rencana dari PPT/PDF</h2><p>Upload slide, lalu durasi, jumlah anak, naskah EN/ID, dan kunci jawaban dibuat per slide.</p></div>
+      <button class="btn ${importOpen?'':'primary'} small" id="impToggle">${importOpen?'Tutup':'Upload slide'}</button>
+    </div>
+    <div class="imp-form">
+      ${sampleFn? '' : '<div class="msg info">Mode dasar: setiap slide jadi satu baris rencana dengan waktu dibagi rata, dan teks slide masuk ke catatan. Naskah bahasa Inggris kamu tulis sendiri, terjemahannya otomatis.</div>'}
+      <label class="drop" id="drop"><span id="dropTxt">Pilih file .pdf (disarankan) atau .pptx</span><small>Pakai PDF supaya gambar slide ikut tampil saat mengajar. Dari PowerPoint: File → Save As → PDF</small>
+        <input type="file" id="impFile" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"></label>
+      <div class="imp-grid">
+        <label class="f">Nama pengajar<input id="impTeacher" value="${esc(st.teacher)}"></label>
+        <label class="f">Jenjang<select id="impLevel"><option ${st.level==='SMP'?'selected':''}>SMP</option><option ${st.level==='SMA'?'selected':''}>SMA</option></select></label>
+        <label class="f">Jumlah murid<input id="impStudents" type="number" min="1" max="40" inputmode="numeric" value="${st.students}"></label>
+        <label class="f">Durasi kelas (menit)<input id="impMin" type="number" min="10" max="240" inputmode="numeric" value="60"></label>
+        <label class="f">Jam mulai<input id="impStart" type="time" value="19:00"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" id="impGo" disabled>Buat rencana</button>
+        <button class="btn" id="impStop" hidden>Hentikan</button>
+      </div>
+      <div id="impProg"></div>
+    </div>
+  </section>`;
+}
+function renderPlan(){
+  const L=lesson(); const {starts}=plannedStarts(L);
+  const la=L.lastActual;
+  $('#main').innerHTML = importHtml() + deckBarHtml(L) + `
+  <div class="plan-head">
+    <label class="f">Judul materi<input id="pTitle" value="${esc(L.title)}"></label>
+    <label class="f">Durasi kelas (menit)<input id="pClass" type="number" min="10" max="240" inputmode="numeric" value="${L.classMin}"></label>
+    <label class="f">Jam mulai<input id="pStart" type="time" value="${esc(L.startClock)}"></label>
+  </div>
+  <div class="sum" id="sum"></div>
+  <div id="barWrap">${hourBar(L,false)}</div>
+  <div class="rows" id="rows">
+    ${L.slides.map((s,i)=>`
+    <div class="row ${openSlide===s.id?'open':''}" data-id="${s.id}">
+      <button class="row-btn" data-toggle="${s.id}" aria-expanded="${openSlide===s.id}">
+        <span class="row-n">${i+1}</span>
+        ${thumbHtml(L,s)}
+        <span><div class="row-t" data-t="${s.id}">${esc(s.title)}</div>
+          <div class="row-meta num" data-time="${s.id}">${mmss(starts[i])}–${mmss(starts[i]+s.sec)} · ${clockAdd(L.startClock,starts[i])}–${clockAdd(L.startClock,starts[i]+s.sec)}</div></span>
+        <span class="row-r num"><b data-dur="${s.id}">${mmss(s.sec)}</b><span data-kids="${s.id}">${s.kids} anak</span>${la&&la[s.id]!=null?`<div class="last">lalu ${mmss(la[s.id])}</div>`:''}<span class="chev" aria-hidden="true">›</span></span>
+      </button>
+      <div class="editor">
+        <label class="f">Judul tahapan<input data-f="title" value="${esc(s.title)}"></label>
+        <div class="ed-grid">
+          <label class="f">Durasi (menit)<input data-f="min" type="number" min="0" max="120" step="0.5" inputmode="decimal" value="${+(s.sec/60).toFixed(2)}"></label>
+          <label class="f">Jumlah anak menjawab<input data-f="kids" type="number" min="0" max="40" inputmode="numeric" value="${s.kids}"></label>
+        </div>
+        ${L.deck?`<div class="pagepick"><label class="f">Slide yang ditampilkan<select data-f="page"><option value="">Tanpa slide</option>${Array.from({length:L.deck.pages},(_,j)=>`<option value="${j+1}" ${s.page===j+1?'selected':''}>Slide ${j+1}</option>`).join('')}</select></label>${thumbHtml(L,s)}</div>`:''}
+        <div class="pairs-title">Naskah — tulis bahasa Inggris, terjemahan Indonesia terisi otomatis di bawahnya</div>
+        <div class="pairs" data-pairs="${s.id}">${pairsHtml(s)}</div>
+        <div><button class="btn small" data-act="addline">+ Tambah kalimat</button></div>
+        <label class="f">Catatan & kunci jawaban<textarea data-f="notes">${esc(s.notes)}</textarea></label>
+        <div class="ed-actions">
+          <button class="btn" data-act="up" ${i===0?'disabled':''}>Naikkan</button>
+          <button class="btn" data-act="down" ${i===L.slides.length-1?'disabled':''}>Turunkan</button>
+          <button class="btn" data-act="dup">Duplikat tahapan</button>
+          <button class="btn danger" data-act="del">Hapus tahapan</button>
+        </div>
+      </div>
+    </div>`).join('')}
+  </div>
+  <div class="plan-actions">
+    <button class="btn primary" id="addSlide">Tambah tahapan</button>
+    <button class="btn" id="newLesson">Materi baru</button>
+    <button class="btn" id="dupLesson">Salin materi</button>
+    <button class="btn danger" id="delLesson">Hapus materi</button>
+    <button class="btn" id="backup">Backup data</button>
+    <label class="btn" style="display:inline-flex;align-items:center">Pulihkan dari backup<input type="file" id="restore" accept=".json,application/json" hidden></label>
+  </div>
+  <p class="foot" id="foot"></p>`;
+  updateSum(); updateFoot();
+  L.slides.forEach(s=>s.lines.forEach(p=>paintT(p.k)));
+  bindImport(); bindDeck(L); fillImgs();
+
+  $('#pTitle').oninput=e=>{ L.title=e.target.value; save(); fillPicker(); };
+  $('#pClass').oninput=e=>{ const v=+e.target.value; if(v>=10){ L.classMin=v; save(); refreshNumbers(); } };
+  $('#pStart').oninput=e=>{ L.startClock=e.target.value||'00:00'; save(); refreshNumbers(); };
+  const rows=$('#rows');
+  const slideOf = el => { const id=el.closest('.row').dataset.id; return L.slides.find(x=>x.id===id); };
+  const rePairs = (s, focusK) => {
+    const box=rows.querySelector(`[data-pairs="${s.id}"]`); box.innerHTML=pairsHtml(s);
+    s.lines.forEach(p=>paintT(p.k));
+    if(focusK){ const t=box.querySelector(`.pen[data-k="${focusK}"]`); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } }
+  };
+  rows.addEventListener('click',e=>{
+    const t=e.target.closest('[data-toggle]');
+    if(t){ const id=t.dataset.toggle; openSlide = openSlide===id?null:id;
+      rows.querySelectorAll('.row').forEach(r=>{ const o=r.dataset.id===openSlide; r.classList.toggle('open',o); r.querySelector('.row-btn').setAttribute('aria-expanded',o); }); return; }
+    const del=e.target.closest('[data-del]');
+    if(del){ const s=slideOf(del); s.lines=s.lines.filter(p=>p.k!==del.dataset.del); save(); rePairs(s); return; }
+    const ts=e.target.closest('.tstat');
+    if(ts && !ts.disabled){ queueTranslate(ts.dataset.k,0); return; }
+    const a=e.target.closest('[data-act]'); if(!a) return;
+    const id=a.closest('.row').dataset.id, i=L.slides.findIndex(s=>s.id===id);
+    if(a.dataset.act==='addline'){ const p={k:uid(),en:'',id:''}; L.slides[i].lines.push(p); save(); rePairs(L.slides[i],p.k); return; }
+    if(a.dataset.act==='up'&&i>0){ [L.slides[i-1],L.slides[i]]=[L.slides[i],L.slides[i-1]]; }
+    if(a.dataset.act==='down'&&i<L.slides.length-1){ [L.slides[i+1],L.slides[i]]=[L.slides[i],L.slides[i+1]]; }
+    if(a.dataset.act==='dup'){ const src=L.slides[i]; const c={...src, id:uid(), title:src.title+' (salinan)', lines:src.lines.map(p=>({...p,k:uid()}))}; L.slides.splice(i+1,0,c); openSlide=c.id; }
+    if(a.dataset.act==='del'){ if(L.slides.length<=1){ notify('Materi perlu minimal satu tahapan.'); return; } ask(`Hapus tahapan "${L.slides[i].title}"?`,{ok:'Hapus',danger:true}).then(y=>{ if(!y) return; L.slides.splice(i,1); save(); syncRunToLesson(); renderPlan(); }); return; }
+    save(); syncRunToLesson(); renderPlan();
+  });
+  rows.addEventListener('keydown',e=>{
+    if(!e.target.classList.contains('pen') || e.key!=='Enter' || e.shiftKey || e.isComposing) return;
+    e.preventDefault();
+    const s=slideOf(e.target), idx=s.lines.findIndex(p=>p.k===e.target.dataset.k);
+    queueTranslate(e.target.dataset.k,0);
+    const p={k:uid(),en:'',id:''}; s.lines.splice(idx+1,0,p); save(); rePairs(s,p.k);
+  });
+  rows.addEventListener('focusout',e=>{
+    if(e.target.classList.contains('pen') && tTimers[e.target.dataset.k] && !tState[e.target.dataset.k]) queueTranslate(e.target.dataset.k,0);
+  });
+  rows.addEventListener('input',e=>{
+    const tg=e.target;
+    if(tg.classList.contains('pen')){
+      const s=slideOf(tg), idx=s.lines.findIndex(p=>p.k===tg.dataset.k), p=s.lines[idx];
+      if(tg.value.includes('\n')){ // pasted several lines
+        const parts=tg.value.split('\n').map(x=>x.trim()).filter(Boolean);
+        p.en=parts.shift()||''; const added=parts.map(en=>({k:uid(),en,id:''}));
+        s.lines.splice(idx+1,0,...added); save(); rePairs(s);
+        [p,...added].forEach((x,j)=>queueTranslate(x.k,200+j*50)); return;
+      }
+      p.en=tg.value; save(); tState[p.k]=null; paintT(p.k);
+      if(p.en.trim()) queueTranslate(p.k,1400); else clearTimeout(tTimers[p.k]);
+      return;
+    }
+    if(tg.classList.contains('pid')){ const s=slideOf(tg); const p=s.lines.find(x=>x.k===tg.dataset.k); p.id=tg.value; save(); return; }
+    const f=tg.dataset.f; if(!f) return;
+    const s=slideOf(tg), id=s.id;
+    if(f==='page'){ s.page=tg.value?+tg.value:null; save(); const row=tg.closest('.row'); row.querySelectorAll('.thumb').forEach(t=>t.outerHTML=thumbHtml(L,s)); fillImgs(row); return; }
+    if(f==='title'){ s.title=tg.value; rows.querySelector(`[data-t="${id}"]`).textContent=s.title; }
+    if(f==='min'){ const v=parseFloat(String(tg.value).replace(',','.')); if(!isNaN(v)&&v>=0){ s.sec=Math.round(v*60); } }
+    if(f==='kids'){ const v=parseInt(tg.value,10); if(!isNaN(v)&&v>=0) s.kids=Math.min(40,v); }
+    if(f==='notes') s.notes=tg.value;
+    save(); refreshNumbers();
+  });
+  $('#addSlide').onclick=()=>{ const s=sl('Tahap baru',3,2,''); s.lines=[{k:uid(),en:'',id:''}]; L.slides.push(s); openSlide=s.id; save(); renderPlan(); const r=document.querySelector(`.row[data-id="${s.id}"]`); r&&r.scrollIntoView({block:'center'}); };
+  $('#newLesson').onclick=newMateriDialog;
+  $('#dupLesson').onclick=()=>{ dupLesson(L); toast('Materi disalin. Ganti judulnya di sini.'); };
+  $('#backup').onclick=()=>{
+    const blob=new Blob([JSON.stringify(state,null,1)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='knotes-backup-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  };
+  $('#restore').onchange=async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    try{
+      const p=JSON.parse(await f.text());
+      if(!p || !Array.isArray(p.lessons) || !p.lessons.length) throw new Error();
+      e.target.value='';
+      if(!await ask(`Pulihkan ${p.lessons.length} materi dari "${f.name}"? Data yang sekarang akan diganti.`,{ok:'Pulihkan',danger:true})) return;
+      state=migrate(p); state.activeId=state.lessons.find(l=>l.id===state.activeId)?state.activeId:state.lessons[0].id; save(); switchLesson();
+      toast('Data berhasil dipulihkan.');
+    }catch(err){ notify('File ini bukan backup KNotes yang valid.'); }
+  };
+  $('#delLesson').onclick=async()=>{
+    if(state.lessons.length<=1){ notify('Ini satu-satunya materi. Buat materi lain dulu sebelum menghapus.'); return; }
+    if(!await ask(`Hapus materi "${L.title}" beserta semua tahapannya?`,{ok:'Hapus',danger:true})) return;
+    state.lessons=state.lessons.filter(x=>x.id!==L.id); state.activeId=state.lessons[0].id; save(); dropDeck(L.deck); switchLesson();
+  };
+}
+function deckBarHtml(L){
+  return `<section class="panel deckbar"><div class="t">${L.deck?`<b>Slide: ${esc(L.deck.name)}</b><span>${L.deck.pages} slide · atur slide untuk tiap tahapan di bawah</span>`:`<b>Belum ada file slide untuk materi ini</b><span>Lampirkan PDF supaya slide tiap tahapan tampil saat mengajar</span>`}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn small ${L.deck?'':'primary'}" style="display:inline-flex;align-items:center">${L.deck?'Ganti file':'Lampirkan PDF slide'}<input type="file" id="deckFile" accept=".pdf,application/pdf" hidden></label>${L.deck?'<button class="btn small" id="deckRemove">Lepas</button>':''}</div>
+  <div id="deckProg" style="flex-basis:100%;display:none"></div></section>`;
+}
+function bindDeck(L){
+  const fi=$('#deckFile'); if(!fi) return;
+  fi.onchange=()=>{ const f=fi.files[0]; fi.value=''; if(f) attachDeck(L,f); };
+  const rm=$('#deckRemove');
+  if(rm) rm.onclick=async()=>{ if(!await ask('Lepas file slide dari materi ini? Pilihan slide per tahapan ikut dikosongkan.',{ok:'Lepas',danger:true})) return; const old=L.deck; L.deck=null; L.slides.forEach(s=>s.page=null); save(); dropDeck(old); renderPlan(); };
+}
+async function attachDeck(L,f){
+  if(!/\.pdf$/i.test(f.name) && f.type!=='application/pdf'){ notify(PDF_HINT); return; }
+  const box=$('#deckProg'); const say=(t,k='info')=>{ if(box){ box.style.display=''; box.innerHTML=`<div class="msg ${k}">${esc(t)}</div>`; } };
+  try{
+    const r=await readPdf(f, t=>say(t));
+    if(!r.slides.length) throw new Error('PDF kosong.');
+    const deckId=uid();
+    const fail=await saveDeckImgs(deckId, r.slides, (i,n)=>say(`Menyimpan gambar slide ${i}/${n}`));
+    const old=L.deck, hadMap=!!old;
+    L.deck={id:deckId, name:f.name, pages:r.slides.length};
+    if(!hadMap) L.slides.forEach((s,i)=>{ s.page = i<r.slides.length? i+1 : null; });
+    else L.slides.forEach(s=>{ if(s.page>r.slides.length) s.page=null; });
+    save(); dropDeck(old); renderPlan();
+    toast(hadMap? 'File slide diganti.' : 'Slide terpasang: tahap 1 = slide 1, dan seterusnya. Cek pilihan slide tiap tahapan.');
+    if(fail) notify(`${fail} gambar slide gagal disimpan ke ${syncName}, jadi hanya tampil di perangkat ini. Kalau pakai Firebase, cek Rules untuk jamngajar_slides.`);
+  }catch(e){ console.warn(e); say('PDF tidak bisa dibaca. Coba simpan ulang file-nya sebagai PDF.','err'); }
+}
+function activate(id, toPlan){ state.activeId=id; save(); releaseWake(); run=freshRun(); saveRun(); openSlide=null; setView(toPlan?'plan':view); }
+function dupLesson(L){ const c=JSON.parse(JSON.stringify(L)); c.id=uid(); c.title=L.title+' (salinan)'; c.lastActual=null; c.slides.forEach(s=>{ s.id=uid(); s.lines.forEach(p=>p.k=uid()); }); state.lessons.push(c); activate(c.id,true); }
+async function newMateriDialog(){
+  const v=await choose('Tambah materi baru',[
+    {v:'file', t:'Dari file slide (PDF)', d:'Tahapan dibuat otomatis per slide, dan gambar slidenya tampil saat mengajar'},
+    {v:'blank', t:'Mulai kosong', d:'Susun tahapan, durasi, dan naskah sendiri'},
+    {v:'copy', t:`Salin "${lesson().title}"`, d:'Pakai susunan materi ini sebagai template'}]);
+  if(v==='file'){ importOpen=true; await setView('plan'); const i=$('#imp'); if(i){ i.scrollIntoView({block:'start'}); } window.scrollTo({top:0}); }
+  else if(v==='blank'){ const n=blankLesson(); state.lessons.push(n); activate(n.id,true); toast('Materi baru dibuat. Ganti judulnya di sini.'); }
+  else if(v==='copy'){ dupLesson(lesson()); toast('Materi disalin. Ganti judulnya di sini.'); }
+}
+function updateSum(){
+  const L=lesson(), {total}=plannedStarts(L), cls=L.classMin*60, diff=cls-total;
+  const kidsTotal=L.slides.reduce((a,s)=>a+(+s.kids||0),0);
+  const el=$('#sum'); if(!el) return;
+  el.innerHTML=`<span>Total rencana <b class="num">${mmss(total)}</b> dari ${L.classMin}:00</span>
+    <span class="chip ${diff<0?'late':(diff>=60?'ok':'early')}" style="margin:0">${diff<0?`Kelebihan ${mmss(-diff)} — potong durasi`:`Cadangan ${mmss(diff)}`}</span>
+    <span>${L.slides.length} tahapan · ${kidsTotal} kali anak menjawab</span>`;
+}
+function refreshNumbers(){
+  const L=lesson(), {starts}=plannedStarts(L);
+  L.slides.forEach((s,i)=>{
+    const t=document.querySelector(`[data-time="${s.id}"]`); if(t) t.textContent=`${mmss(starts[i])}–${mmss(starts[i]+s.sec)} · ${clockAdd(L.startClock,starts[i])}–${clockAdd(L.startClock,starts[i]+s.sec)}`;
+    const d=document.querySelector(`[data-dur="${s.id}"]`); if(d) d.textContent=mmss(s.sec);
+    const k=document.querySelector(`[data-kids="${s.id}"]`); if(k) k.textContent=`${s.kids} anak`;
+  });
+  const bw=$('#barWrap'); if(bw) bw.innerHTML=hourBar(L,false);
+  updateSum();
+}
+function syncRunToLesson(){ const L=lesson(); if(run.idx>=L.slides.length){ run.idx=L.slides.length-1; saveRun(); } }
+function updateFoot(){ const f=$('#foot'); if(f) f.textContent=`${syncLabel}. Pintasan keyboard saat mengajar: Spasi = mulai/jeda, → = slide berikutnya, ← = sebelumnya.`; }
+
+/* ---------- import PPT/PDF ---------- */
+const libs={};
+function loadScript(src){
+  if(libs[src]) return libs[src];
+  return libs[src]=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>{ delete libs[src]; rej(new Error('Gagal memuat '+src)); }; document.head.appendChild(s); });
+}
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFW='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const JSZIP='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+const MAXS=40;
+
+async function readPdf(file, onStep){
+  await loadScript(PDFJS); await loadScript(PDFW);
+  const lib=window.pdfjsLib; lib.GlobalWorkerOptions.workerSrc=PDFW;
+  const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()), isEvalSupported:false}).promise;
+  const n=Math.min(pdf.numPages,MAXS), out=[];
+  for(let i=1;i<=n;i++){
+    onStep(`Membaca slide ${i}/${n}`);
+    const page=await pdf.getPage(i);
+    const tc=await page.getTextContent();
+    let text=''; tc.items.forEach(it=>{ text+=it.str+(it.hasEOL?'\n':' '); });
+    text=text.replace(/[ \t]+/g,' ').replace(/\n\s*\n+/g,'\n').trim();
+    let image=null, img=null;
+    try{
+      const v0=page.getViewport({scale:1}), sc=Math.min(2,1000/v0.width), vp=page.getViewport({scale:sc});
+      const cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+      const ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+      await page.render({canvasContext:ctx, viewport:vp}).promise;
+      img=encodeCanvas(cv);
+      if(sampleImages) image=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.72));
+    }catch(e){ console.warn(e); }
+    out.push({n:i, text, notes:'', image, img});
+  }
+  return {slides:out, total:pdf.numPages};
+}
+async function readPptx(file, onStep){
+  await loadScript(JSZIP);
+  const zip=await window.JSZip.loadAsync(await file.arrayBuffer());
+  const xml=async p=>{ const f=zip.file(p); return f? new DOMParser().parseFromString(await f.async('string'),'application/xml') : null; };
+  const textOf=doc=>{ if(!doc) return ''; return Array.from(doc.getElementsByTagName('a:p')).map(p=>Array.from(p.getElementsByTagName('a:t')).map(t=>t.textContent).join('')).filter(x=>x.trim()).join('\n'); };
+  let order=[];
+  try{
+    const pres=await xml('ppt/presentation.xml'), rels=await xml('ppt/_rels/presentation.xml.rels');
+    const map={}; Array.from(rels.getElementsByTagName('Relationship')).forEach(r=>map[r.getAttribute('Id')]=r.getAttribute('Target'));
+    order=Array.from(pres.getElementsByTagName('p:sldId')).map(s=>map[s.getAttribute('r:id')]).filter(Boolean).map(t=>'ppt/'+t.replace(/^\/?ppt\//,'').replace(/^\.\.\//,''));
+  }catch(e){}
+  if(!order.length){
+    order=Object.keys(zip.files).filter(p=>/^ppt\/slides\/slide\d+\.xml$/.test(p)).sort((a,b)=>+a.match(/(\d+)\.xml/)[1]-+b.match(/(\d+)\.xml/)[1]);
+  }
+  const total=order.length; order=order.slice(0,MAXS); const out=[];
+  for(let i=0;i<order.length;i++){
+    onStep(`Membaca slide ${i+1}/${order.length}`);
+    const path=order[i]; const text=textOf(await xml(path));
+    let notes='';
+    try{
+      const rp=path.replace(/slides\/(slide\d+\.xml)$/,'slides/_rels/$1.rels'); const rel=await xml(rp);
+      const n=rel && Array.from(rel.getElementsByTagName('Relationship')).find(r=>/notesSlide/.test(r.getAttribute('Type')||''));
+      if(n){ const np='ppt/'+n.getAttribute('Target').replace(/^\.\.\//,''); notes=textOf(await xml(np)).replace(/^\d+\s*$/m,'').trim(); }
+    }catch(e){}
+    out.push({n:i+1, text, notes, image:null});
+  }
+  return {slides:out, total};
+}
+
+let impFile=null, impCtl=null;
+function bindImport(){
+  const tog=$('#impToggle'); if(!tog) return;
+  tog.onclick=()=>{ importOpen=!importOpen; $('#imp').classList.toggle('open',importOpen); tog.textContent=importOpen?'Tutup':'Upload slide'; tog.classList.toggle('primary',!importOpen); };
+  const fi=$('#impFile');
+  const setFile=f=>{ impFile=f; $('#dropTxt').textContent=f?f.name:'Pilih file .pdf (disarankan) atau .pptx'; $('#drop').classList.toggle('has',!!f); $('#impGo').disabled=!f; };
+  if(impFile) setFile(impFile);
+  fi.onchange=()=>{ const f=fi.files[0]; if(f && /\.ppt$/i.test(f.name)){ progMsg('err','File .ppt lama belum bisa dibaca. Simpan dulu sebagai .pptx atau PDF dari PowerPoint.'); setFile(null); return; } setFile(f||null); };
+  const drop=$('#drop');
+  drop.addEventListener('dragover',e=>{ e.preventDefault(); });
+  drop.addEventListener('drop',e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) setFile(f); });
+  $('#impGo').onclick=runImport;
+  $('#impStop').onclick=()=>{ impCtl && impCtl.abort(); };
+}
+function progMsg(kind, text){ const p=$('#impProg'); if(p) p.innerHTML=`<div class="msg ${kind}">${esc(text)}</div>`; }
+function progList(steps, pct){
+  const p=$('#impProg'); if(!p) return;
+  p.innerHTML=`<div class="bar" style="margin-bottom:10px"><div style="width:${pct}%"></div></div><div class="prog">`+
+    steps.map(s=>`<div class="st ${s.st}"><i>${s.st==='done'?'✓':s.st==='err'?'!':s.st==='busy'?'…':'·'}</i><span>${esc(s.t)}</span></div>`).join('')+`</div>`;
+}
+
+async function finishImport(L, failed, D, fname){
+  if(D && D.some(s=>s.img)){
+    const deckId=uid();
+    await saveDeckImgs(deckId, D, (i,n)=>progMsg('info',`Menyimpan gambar slide ${i}/${n}`));
+    L.deck={id:deckId, name:fname||'slide.pdf', pages:D.length};
+  }
+  state.lessons.push(L); state.activeId=L.id; save();
+  impFile=null; importOpen=false;
+  run=freshRun(); saveRun(); openSlide=null; render();
+  const box=document.createElement('div'); box.className='msg ok'; box.style.marginBottom='14px';
+  box.textContent=`Rencana "${L.title}" dibuat: ${L.slides.length} bagian. Cek lagi durasi, jumlah anak, dan kunci jawaban sebelum kelas.`+(failed?` ${failed} slide gagal dibuat naskahnya, isi manual.`:'');
+  $('#main').prepend(box);
+}
+async function runImport(){
+  if(!impFile) return;
+  const st=state.settings;
+  st.teacher=$('#impTeacher').value.trim()||'Guru'; st.level=$('#impLevel').value; st.students=Math.max(1,+$('#impStudents').value||8); save();
+  const classMin=Math.max(10,+$('#impMin').value||60), startClock=$('#impStart').value||'19:00';
+  impCtl=new AbortController(); const signal=impCtl.signal;
+  $('#impGo').disabled=true; $('#impStop').hidden=false;
+  const steps=[{t:'Membaca file',st:'busy'},{t:'Membagi waktu per slide',st:'wait'},{t:'Menulis naskah per slide',st:'wait'}];
+  progList(steps,3);
+  try{
+    const isPdf=/\.pdf$/i.test(impFile.name)||impFile.type==='application/pdf';
+    const deck = isPdf? await readPdf(impFile, t=>{ steps[0].t=t; progList(steps,5); }) : await readPptx(impFile, t=>{ steps[0].t=t; progList(steps,5); });
+    if(signal.aborted) throw {code:'cancelled'};
+    const D=deck.slides; if(!D.length) throw new Error('Tidak ada slide yang terbaca dari file ini.');
+    steps[0]={t:`File terbaca: ${D.length} slide`+(deck.total>D.length?` (dibatasi ${MAXS} slide pertama)`:''),st:'done'};
+    if(!sampleFn){
+      const per=Math.max(0.5, Math.floor(((classMin-3)/D.length)*2)/2);
+      const L={id:uid(), title:impFile.name.replace(/\.(pdf|pptx)$/i,''), classMin, startClock, lastActual:null,
+        slides:D.map(s=>({id:uid(), title:((s.text||'').split('\n').find(x=>x.trim())||`Slide ${s.n}`).slice(0,90), sec:Math.round(per*60), kids:0,
+          page:s.n, lines:[{k:uid(),en:'',id:''}], notes:[s.text,s.notes].filter(Boolean).join('\n\n').slice(0,2000)}))};
+      await finishImport(L,0,D,impFile.name);
+    } else {
+    steps[1].st='busy'; progList(steps,12);
+
+    const deckText=D.map(s=>`--- Slide ${s.n} ---\n${(s.text||'(tidak ada teks — kemungkinan gambar/video)').slice(0,1500)}${s.notes?`\n[Catatan pembicara] ${s.notes.slice(0,600)}`:''}`).join('\n\n');
+    const outline=await sampleFn.json(
+`Kamu membantu guru les bahasa Inggris online untuk murid ${st.level} di Indonesia merencanakan kelas ${classMin} menit dari slide berikut. Kelas berisi sekitar ${st.students} murid; guru memanggil murid satu per satu untuk menjawab/membaca.
+
+${deckText}
+
+Buat rencana waktu. Aturan:
+- Tepat ${D.length} item, satu per slide, urutan sama.
+- Boleh menambah SATU item terakhir dengan "slide": null berjudul "Closing — recap & salam penutup" HANYA jika slide terakhir bukan penutup/rekap.
+- "minutes" kelipatan 0,5. Total semua menit antara ${classMin-5} dan ${classMin-2} (sisakan cadangan).
+- Cover/pembuka ±1 menit (sapaan + perkenalan). Aktivitas membaca banyak kalimat, diskusi, atau presentasi murid dapat waktu paling banyak. Slide video/listening: perkirakan durasi video + menjawab.
+- "kids": berapa murid yang perlu menjawab/membaca di slide itu (0 bila guru saja yang bicara), maksimal ${st.students}.
+- "title": label singkat bahasa Indonesia yang menyebut aktivitas, contoh "Warm-up — raincoat atau umbrella?".
+- "activity": satu kalimat bahasa Indonesia tentang apa yang terjadi di slide itu.
+Selain itu beri "lessonTitle": judul materi singkat (topik + jenjang).
+Balas hanya JSON: {"lessonTitle":"...","items":[{"slide":1,"title":"...","minutes":1,"kids":0,"activity":"..."}]}`,
+      {signal});
+    let items=Array.isArray(outline&&outline.items)? outline.items : [];
+    // align to slides
+    const plan=D.map((s,i)=>{ const it=items.find(x=>x&&x.slide===s.n)||items[i]||{}; return {
+      slide:s, title:String(it.title||(s.text.split('\n')[0]||`Slide ${s.n}`)).slice(0,90),
+      minutes:Math.max(0.5,+it.minutes||3), kids:Math.max(0,Math.min(st.students,parseInt(it.kids,10)||0)), activity:String(it.activity||'') }; });
+    const extra=items.find(x=>x&&x.slide===null);
+    if(extra) plan.push({slide:null, title:String(extra.title||'Closing — recap & salam penutup'), minutes:Math.max(1,+extra.minutes||5), kids:Math.max(0,Math.min(st.students,parseInt(extra.kids,10)||2)), activity:String(extra.activity||'Rekap materi dan salam penutup')});
+    let tot=plan.reduce((a,p)=>a+p.minutes,0);
+    if(tot>classMin-2){ const f=(classMin-2)/tot; plan.forEach(p=>p.minutes=Math.max(0.5,Math.round(p.minutes*f*2)/2)); }
+    tot=plan.reduce((a,p)=>a+p.minutes,0);
+    steps[1]={t:`Waktu terbagi: ${plan.length} bagian, total ${String(tot).replace('.',',')} menit`,st:'done'};
+    steps[2].st='busy'; progList(steps,25);
+
+    const results=new Array(plan.length); let done=0, failed=0;
+    const worker=async()=>{
+      while(true){
+        if(signal.aborted) return;
+        const i=results.findIndex((r,j)=>r===undefined && !worker.taken.has(j)); if(i<0) return;
+        worker.taken.add(i);
+        const p=plan[i], prev=plan[i-1], next=plan[i+1];
+        const input=
+`Tulis naskah ucapan guru untuk satu bagian kelas bahasa Inggris online. Murid ${st.level} di Indonesia, jadi guru (${st.teacher}) mengucapkan bahasa Inggris dulu, lalu mengulanginya dalam bahasa Indonesia lisan yang santai dan ramah ("kamu", "ya", "yuk").
+Materi: "${outline.lessonTitle||impFile.name}". Bagian ${i+1} dari ${plan.length}: "${p.title}", ${String(p.minutes).replace('.',',')} menit, memanggil ${p.kids} murid. Aktivitas: ${p.activity}
+${p.slide? `Teks di slide:\n${(p.slide.text||'(tidak ada teks)').slice(0,2500)}${p.slide.notes?`\nCatatan pembicara: ${p.slide.notes.slice(0,800)}`:''}`:'(Bagian ini tidak punya slide.)'}
+${prev?`Bagian sebelumnya: ${prev.title}.`:'Ini bagian PERTAMA: mulai dengan sapaan hangat dan perkenalan diri memakai nama guru, lalu sebut topik hari ini.'}
+${next?`Bagian berikutnya: ${next.title}.`:'Ini bagian TERAKHIR: rekap materi (kosakata & poin utama), ajak foto bersama dengan kamera menyala, lalu salam penutup.'}
+${p.slide&&p.slide.image?'Gambar terlampir adalah tampilan slide ini.':''}
+
+Contoh gaya dari catatan guru sendiri:
+EN: Now we have a conversation between Anna and Ben. Who wants to be Anna, and who wants to be Ben?
+ID: Sekarang ada percakapan antara Anna dan Ben. Siapa yang mau jadi Anna, siapa yang mau jadi Ben?
+
+Aturan:
+- 2–8 baris, kalimat pendek yang benar-benar diucapkan guru, berurutan. Bahasa Inggrisnya sederhana sesuai level murid.
+- Untuk kosakata baru, sebut cara baca di baris Indonesia (contoh: dibaca "rei-ni dei") dan artinya.
+- Kalau ada pertanyaan/daftar pertanyaan di slide, masukkan pertanyaannya sebagai baris.
+- "notes" (bahasa Indonesia, boleh kosong): arti kalimat bahasa Inggris di slide bila membantu, kunci jawaban bila ada soal (tulis "perkiraan" bila tidak yakin, misalnya jawaban bergantung pada video), dan tips waktu singkat.
+Balas hanya JSON: {"lines":[{"en":"...","id":"..."}],"notes":"..."}`;
+        try{
+          const opts={signal}; if(p.slide&&p.slide.image&&sampleImages) opts.images=p.slide.image;
+          const r=await sampleFn.json(input, opts);
+          results[i]={lines:(Array.isArray(r&&r.lines)?r.lines:[]).filter(x=>x&&(x.en||x.id)).map(x=>({en:String(x.en||''),id:String(x.id||'')})), notes:String((r&&r.notes)||'')};
+        }catch(e){
+          if(e&&(e.code==='cancelled'||e.code==='not_granted')) throw e;
+          failed++; results[i]={lines:[], notes:'Naskah slide ini gagal dibuat ('+(e&&e.code||'error')+'). Tulis manual atau coba upload ulang.'};
+        }
+        done++; steps[2].t=`Menulis naskah per slide ${done}/${plan.length}`; progList(steps,25+Math.round(done/plan.length*73));
+      }
+    };
+    worker.taken=new Set();
+    await Promise.all([worker(),worker(),worker()]);
+    if(signal.aborted) throw {code:'cancelled'};
+
+    await finishImport({id:uid(), title:String(outline.lessonTitle||impFile.name.replace(/\.(pdf|pptx)$/i,'')), classMin, startClock, lastActual:null,
+      slides:plan.map((p,i)=>({id:uid(), title:p.title, sec:Math.round(p.minutes*60), kids:p.kids, page:p.slide?p.slide.n:null, lines:mkLines(results[i]?results[i].lines:[]), notes:(results[i]?results[i].notes:'').trim()}))}, failed, D, impFile.name);
+    }
+  }catch(e){
+    if(e&&e.code) progMsg(e.code==='cancelled'?'info':'err', e.code==='cancelled'?'Dihentikan. Belum ada yang disimpan.':aiError(e));
+    else progMsg('err', (e&&e.message)||'File tidak bisa dibaca. Coba simpan ulang sebagai PDF.');
+  }
+  const g=$('#impGo'); if(g){ g.disabled=!impFile; } const s=$('#impStop'); if(s) s.hidden=true;
+  impCtl=null;
+}
+
+/* ---------- shell ---------- */
+function fillPicker(){
+  const p=$('#lessonPick');
+  p.innerHTML=state.lessons.map(l=>`<option value="${l.id}" ${l.id===state.activeId?'selected':''}>${esc(l.title)}</option>`).join('');
+}
+function switchLesson(){ releaseWake(); run=freshRun(); saveRun(); openSlide=null; render(); }
+$('#lessonPick').onchange=async e=>{
+  const id=e.target.value;
+  if(run.running){ fillPicker(); if(!await ask('Kelas sedang berjalan. Pindah materi akan mengulang timer. Lanjut?',{ok:'Pindah'})) return; }
+  state.activeId=id; save(); switchLesson();
+};
+async function setView(v){
+  if(impCtl && v!=='plan' && !await ask('Pembuatan rencana masih berjalan. Hentikan?',{ok:'Hentikan',danger:true})) return;
+  if(impCtl) impCtl.abort();
+  view=v; $('#tabTeach').setAttribute('aria-selected',v==='teach'); $('#tabPlan').setAttribute('aria-selected',v==='plan'); render();
+}
+$('#newMateri').onclick=newMateriDialog;
+$('#tabTeach').onclick=()=>setView('teach'); $('#tabPlan').onclick=()=>setView('plan');
+function render(){ fillPicker(); if(view==='teach'){ syncRunToLesson(); renderTeach(); } else { renderPlan(); renderControls(); } }
+document.addEventListener('keydown',e=>{
+  if(view!=='teach' || document.querySelector('.dlg-back')) return;
+  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+  if(e.code==='Space'){ e.preventDefault(); startPause(); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); if(!run.running && run.base===0) startPause(); go(1); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); go(-1); }
+});
+initFirebase();
+render();
+</script>
+</body>
+</html>
