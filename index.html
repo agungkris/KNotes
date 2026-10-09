@@ -211,6 +211,15 @@ label.f textarea{min-height:80px;resize:vertical;line-height:1.45}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .deckbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
 .deckbar .t span{color:var(--muted);display:block;font-size:.84rem}
+.deckdrop{flex-basis:100%;border:2px dashed var(--sky2);border-radius:12px;padding:16px;text-align:center;color:var(--blue);background:var(--bg);cursor:pointer;font-weight:500;transition:background .15s,border-color .15s}
+.deckdrop small{display:block;color:var(--muted);font-weight:400;margin-top:2px}
+.deckdrop:hover,.deckdrop.over{background:var(--sky);border-color:var(--blue)}
+.drop.over{background:var(--sky2)}
+.slideview .frame.pick{cursor:pointer;border:2px dashed var(--sky2)}
+.slideview .frame.pick:hover,.slideview .frame.pick.over{background:var(--sky2);color:var(--blue)}
+.dropall{position:fixed;inset:0;z-index:80;background:rgba(42,93,143,.18);display:grid;place-items:center;pointer-events:none;padding:16px}
+.dropall div{background:var(--surface);color:var(--blue);border:3px dashed var(--blue);border-radius:18px;padding:28px 32px;font-weight:600;font-size:1.1rem;text-align:center;max-width:420px}
+.dropall small{display:block;color:var(--muted);font-weight:400;font-size:.88rem;margin-top:6px}
 .pagepick{display:grid;grid-template-columns:1fr 160px;gap:12px;align-items:end}
 .pagepick .thumb{width:160px}
 @media (max-width:520px){.editor{padding-left:14px}.big{font-size:2.2rem}.controls .btn{padding:12px 10px}}
@@ -284,6 +293,21 @@ function toast(msg){
   t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; },3200);
 }
 
+/* ---------- file picker yang tidak ikut ter-render ulang ---------- */
+let pickerEl=null;
+function pickFile(accept){
+  return new Promise(res=>{
+    if(pickerEl) pickerEl.remove();
+    const i=document.createElement('input'); i.type='file'; i.accept=accept;
+    i.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+    document.body.appendChild(i); pickerEl=i;
+    i.addEventListener('change',()=>{ const f=i.files&&i.files[0]; i.remove(); if(pickerEl===i) pickerEl=null; res(f||null); },{once:true});
+    i.click();
+  });
+}
+const isPdf=f=>!!f && (/\.pdf$/i.test(f.name||'') || f.type==='application/pdf');
+function withTimeout(pr,ms){ return Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]); }
+
 /* ---------- slide images (IndexedDB cache + Firebase/akun Claude) ---------- */
 const PDF_HINT='Untuk gambar slide, pakai file PDF. Dari PowerPoint: File → Save As → PDF. Dari Canva/Google Slides: Download → PDF.';
 const IMG={mem:{},pend:{},dbp:null};
@@ -308,7 +332,7 @@ function imgGet(deck,page){
 async function imgPut(deck,page,v){
   const k=imgKey(deck,page); IMG.mem[k]=v;
   await idbDo('readwrite',s=>s.put(v,k));
-  if(imgDocFn){ try{ await imgDocFn(k).set({img:v,deck,page}); return true; }catch(e){ console.warn(e); return false; } }
+  if(imgDocFn){ try{ await withTimeout(imgDocFn(k).set({img:v,deck,page}),20000); return true; }catch(e){ console.warn(e); return false; } }
   return true;
 }
 async function saveDeckImgs(deckId,D,onStep){
@@ -328,7 +352,7 @@ function encodeCanvas(cv){
 }
 function thumbHtml(L,s){ if(!L.deck) return '<span></span>'; return s.page? `<span class="thumb" data-deck="${L.deck.id}" data-page="${s.page}">${s.page}</span>` : '<span class="thumb">—</span>'; }
 function slideViewHtml(L,s){
-  if(!L.deck) return `<section class="panel slideview"><div class="frame">Lampirkan file slide (PDF) di tab Rencana<br>supaya slide tiap tahapan tampil di sini.</div></section>`;
+  if(!L.deck) return `<section class="panel slideview"><div class="frame pick" data-deckpick role="button" tabindex="0">Klik atau seret file PDF ke sini<br>supaya slide tiap tahapan tampil saat mengajar.</div></section>`;
   if(!s.page) return `<section class="panel slideview"><div class="frame">Tahapan ini tidak memakai slide.</div></section>`;
   return `<section class="panel slideview"><div class="frame" data-deck="${L.deck.id}" data-page="${s.page}">Memuat slide…</div><div class="cap"><span>Tampilkan di layar: <b>slide ${s.page}</b></span><span>dari ${L.deck.pages} slide</span></div></section>`;
 }
@@ -872,7 +896,7 @@ function importHtml(){
     </div>
     <div class="imp-form">
       ${sampleFn? '' : '<div class="msg info">Mode dasar: setiap slide jadi satu baris rencana dengan waktu dibagi rata, dan teks slide masuk ke catatan. Naskah bahasa Inggris kamu tulis sendiri, terjemahannya otomatis.</div>'}
-      <label class="drop" id="drop"><span id="dropTxt">Pilih file .pdf (disarankan) atau .pptx</span><small>Pakai PDF supaya gambar slide ikut tampil saat mengajar. Dari PowerPoint: File → Save As → PDF</small>
+      <label class="drop" id="drop"><span id="dropTxt">Seret file ke sini atau klik untuk memilih (.pdf disarankan, .pptx bisa)</span><small>Pakai PDF supaya gambar slide ikut tampil saat mengajar. Dari PowerPoint: File → Save As → PDF</small>
         <input type="file" id="impFile" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"></label>
       <div class="imp-grid">
         <label class="f">Nama pengajar<input id="impTeacher" value="${esc(st.teacher)}"></label>
@@ -1031,33 +1055,80 @@ function renderPlan(){
   };
 }
 function deckBarHtml(L){
-  return `<section class="panel deckbar"><div class="t">${L.deck?`<b>Slide: ${esc(L.deck.name)}</b><span>${L.deck.pages} slide · atur slide untuk tiap tahapan di bawah</span>`:`<b>Belum ada file slide untuk materi ini</b><span>Lampirkan PDF supaya slide tiap tahapan tampil saat mengajar</span>`}</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn small ${L.deck?'':'primary'}" style="display:inline-flex;align-items:center">${L.deck?'Ganti file':'Lampirkan PDF slide'}<input type="file" id="deckFile" accept=".pdf,application/pdf" hidden></label>${L.deck?'<button class="btn small" id="deckRemove">Lepas</button>':''}</div>
+  return `<section class="panel deckbar" id="deckbar"><div class="t">${L.deck?`<b>Slide: ${esc(L.deck.name)}</b><span>${L.deck.pages} slide · atur slide untuk tiap tahapan di bawah</span>`:`<b>Belum ada file slide untuk materi ini</b><span>Lampirkan PDF supaya slide tiap tahapan tampil saat mengajar</span>`}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small ${L.deck?'':'primary'}" data-deckpick>${L.deck?'Ganti file PDF':'Pilih file PDF'}</button>${L.deck?'<button class="btn small" id="deckRemove">Lepas</button>':''}</div>
+  <div class="deckdrop" data-deckpick role="button" tabindex="0">Seret file PDF ke sini atau klik untuk memilih<small>${L.deck?'File baru akan menggantikan':'Tahap 1 = slide 1, tahap 2 = slide 2, dan seterusnya'}. Dari PowerPoint: File → Save As → PDF</small></div>
   <div id="deckProg" style="flex-basis:100%;display:none"></div></section>`;
 }
 function bindDeck(L){
-  const fi=$('#deckFile'); if(!fi) return;
-  fi.onchange=()=>{ const f=fi.files[0]; fi.value=''; if(f) attachDeck(L,f); };
   const rm=$('#deckRemove');
-  if(rm) rm.onclick=async()=>{ if(!await ask('Lepas file slide dari materi ini? Pilihan slide per tahapan ikut dikosongkan.',{ok:'Lepas',danger:true})) return; const old=L.deck; L.deck=null; L.slides.forEach(s=>s.page=null); save(); dropDeck(old); renderPlan(); };
+  if(rm) rm.onclick=async()=>{ if(!await ask('Lepas file slide dari materi ini? Pilihan slide per tahapan ikut dikosongkan.',{ok:'Lepas',danger:true})) return; const cur=lesson(); const old=cur.deck; cur.deck=null; cur.slides.forEach(s=>s.page=null); save(); dropDeck(old); renderPlan(); };
 }
-async function attachDeck(L,f){
-  if(!/\.pdf$/i.test(f.name) && f.type!=='application/pdf'){ notify(PDF_HINT); return; }
-  const box=$('#deckProg'); const say=(t,k='info')=>{ if(box){ box.style.display=''; box.innerHTML=`<div class="msg ${k}">${esc(t)}</div>`; } };
+/* klik di mana pun yang bertanda data-deckpick -> pilih PDF */
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-deckpick]'); if(!t) return;
+  e.preventDefault();
+  const id=lesson().id;
+  const f=await pickFile('.pdf,application/pdf');
+  if(f) attachDeck(id,f);
+});
+document.addEventListener('keydown',e=>{ const t=e.target.closest&&e.target.closest('[data-deckpick]'); if(t && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); t.click(); } });
+
+let deckBusy=false;
+async function attachDeck(lessonId,f){
+  if(!isPdf(f)){ notify(PDF_HINT); return; }
+  if(deckBusy){ toast('Masih memproses file sebelumnya, tunggu sebentar.'); return; }
+  deckBusy=true;
+  const say=(t,k='info')=>{ const box=$('#deckProg'); if(box){ box.style.display=''; box.innerHTML=`<div class="msg ${k}">${esc(t)}</div>`; } else if(k!=='err') toast(t); };
+  say('Membuka '+f.name+'…');
   try{
-    const r=await readPdf(f, t=>say(t));
-    if(!r.slides.length) throw new Error('PDF kosong.');
+    let r;
+    try{ r=await readPdf(f, t=>say(t)); }
+    catch(e){ if(e&&e.libFail) throw e; throw Object.assign(new Error('read'),{cause:e}); }
+    if(!r.slides.length) throw Object.assign(new Error('read'),{empty:true});
     const deckId=uid();
     const fail=await saveDeckImgs(deckId, r.slides, (i,n)=>say(`Menyimpan gambar slide ${i}/${n}`));
+    const L=state.lessons.find(l=>l.id===lessonId);   // ambil versi terbaru, bukan salinan lama
+    if(!L){ dropDeck({id:deckId,pages:r.slides.length}); throw Object.assign(new Error('gone'),{gone:true}); }
     const old=L.deck, hadMap=!!old;
     L.deck={id:deckId, name:f.name, pages:r.slides.length};
     if(!hadMap) L.slides.forEach((s,i)=>{ s.page = i<r.slides.length? i+1 : null; });
     else L.slides.forEach(s=>{ if(s.page>r.slides.length) s.page=null; });
-    save(); dropDeck(old); renderPlan();
-    toast(hadMap? 'File slide diganti.' : 'Slide terpasang: tahap 1 = slide 1, dan seterusnya. Cek pilihan slide tiap tahapan.');
+    save(); dropDeck(old); render();
+    toast(hadMap? `File slide diganti: ${r.slides.length} slide.` : `Slide terpasang (${r.slides.length} slide). Tahap 1 = slide 1, dan seterusnya.`);
     if(fail) notify(`${fail} gambar slide gagal disimpan ke ${syncName}, jadi hanya tampil di perangkat ini. Kalau pakai Firebase, cek Rules untuk jamngajar_slides.`);
-  }catch(e){ console.warn(e); say('PDF tidak bisa dibaca. Coba simpan ulang file-nya sebagai PDF.','err'); }
+  }catch(e){
+    console.warn(e, e&&e.cause);
+    const msg = e&&e.libFail? 'Pembaca PDF gagal dimuat. Cek koneksi internet, lalu muat ulang halaman dan coba lagi.'
+      : e&&e.gone? 'Materinya sudah dihapus, file tidak dipasang.'
+      : e&&e.empty? 'PDF ini tidak punya halaman.'
+      : 'PDF tidak bisa dibaca'+(e&&e.cause&&e.cause.name==='PasswordException'?' karena dikunci password':'')+'. Coba ekspor ulang file-nya sebagai PDF.';
+    say(msg,'err'); if(!$('#deckProg')) notify(msg);
+  }
+  deckBusy=false;
 }
+
+/* ---------- drag & drop PDF ke mana saja ---------- */
+let dragDepth=0, dropOv=null;
+const hasFiles=e=>e.dataTransfer && Array.from(e.dataTransfer.types||[]).includes('Files');
+function showDropAll(on){
+  if(on && !dropOv){ dropOv=document.createElement('div'); dropOv.className='dropall';
+    dropOv.innerHTML=`<div>Lepaskan PDF untuk dipasang ke<br>"${esc(lesson().title)}"<small>Ke kotak "Buat rencana dari PPT/PDF" kalau mau membuat materi baru</small></div>`; document.body.appendChild(dropOv); }
+  if(!on && dropOv){ dropOv.remove(); dropOv=null; }
+}
+window.addEventListener('dragenter',e=>{ if(!hasFiles(e)) return; e.preventDefault(); dragDepth++; if(!e.target.closest||!e.target.closest('#drop')) showDropAll(true); });
+window.addEventListener('dragover',e=>{ if(!hasFiles(e)) return; e.preventDefault();
+  const inImp=e.target.closest&&e.target.closest('#drop'); showDropAll(!inImp);
+  document.querySelectorAll('.deckdrop,.frame.pick,.drop').forEach(x=>x.classList.toggle('over', x.contains(e.target)));
+  e.dataTransfer.dropEffect='copy'; });
+window.addEventListener('dragleave',e=>{ if(!hasFiles(e)) return; dragDepth=Math.max(0,dragDepth-1); if(!dragDepth){ showDropAll(false); document.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); } });
+window.addEventListener('drop',e=>{
+  if(!hasFiles(e)) return; e.preventDefault(); dragDepth=0; showDropAll(false); document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
+  if(e.target.closest&&e.target.closest('#drop')) return;   // ditangani kotak impor
+  const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f) return;
+  if(!isPdf(f)){ notify('Yang bisa diseret ke sini hanya file PDF. '+PDF_HINT); return; }
+  attachDeck(lesson().id,f);
+});
 function activate(id, toPlan){ state.activeId=id; save(); releaseWake(); run=freshRun(); saveRun(); openSlide=null; setView(toPlan?'plan':view); }
 function dupLesson(L){ const c=JSON.parse(JSON.stringify(L)); c.id=uid(); c.title=L.title+' (salinan)'; c.lastActual=null; c.slides.forEach(s=>{ s.id=uid(); s.lines.forEach(p=>p.k=uid()); }); state.lessons.push(c); activate(c.id,true); }
 async function newMateriDialog(){
@@ -1102,8 +1173,8 @@ const JSZIP='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 const MAXS=40;
 
 async function readPdf(file, onStep){
-  await loadScript(PDFJS); await loadScript(PDFW);
-  const lib=window.pdfjsLib; lib.GlobalWorkerOptions.workerSrc=PDFW;
+  try{ await loadScript(PDFJS); await loadScript(PDFW); }catch(e){ throw Object.assign(new Error('lib'),{libFail:true}); }
+  const lib=window.pdfjsLib; if(!lib) throw Object.assign(new Error('lib'),{libFail:true}); lib.GlobalWorkerOptions.workerSrc=PDFW;
   const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()), isEvalSupported:false}).promise;
   const n=Math.min(pdf.numPages,MAXS), out=[];
   for(let i=1;i<=n;i++){
@@ -1159,12 +1230,12 @@ function bindImport(){
   const tog=$('#impToggle'); if(!tog) return;
   tog.onclick=()=>{ importOpen=!importOpen; $('#imp').classList.toggle('open',importOpen); tog.textContent=importOpen?'Tutup':'Upload slide'; tog.classList.toggle('primary',!importOpen); };
   const fi=$('#impFile');
-  const setFile=f=>{ impFile=f; $('#dropTxt').textContent=f?f.name:'Pilih file .pdf (disarankan) atau .pptx'; $('#drop').classList.toggle('has',!!f); $('#impGo').disabled=!f; };
+  const setFile=f=>{ impFile=f; $('#dropTxt').textContent=f?f.name:'Seret file ke sini atau klik untuk memilih (.pdf disarankan, .pptx bisa)'; $('#drop').classList.toggle('has',!!f); $('#impGo').disabled=!f; };
   if(impFile) setFile(impFile);
   fi.onchange=()=>{ const f=fi.files[0]; if(f && /\.ppt$/i.test(f.name)){ progMsg('err','File .ppt lama belum bisa dibaca. Simpan dulu sebagai .pptx atau PDF dari PowerPoint.'); setFile(null); return; } setFile(f||null); };
   const drop=$('#drop');
-  drop.addEventListener('dragover',e=>{ e.preventDefault(); });
   drop.addEventListener('drop',e=>{ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) setFile(f); });
+  drop.addEventListener('click',async e=>{ e.preventDefault(); const f=await pickFile('.pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation'); if(f){ if(/\.ppt$/i.test(f.name)){ progMsg('err','File .ppt lama belum bisa dibaca. Simpan dulu sebagai .pptx atau PDF.'); return; } setFile(f); } });
   $('#impGo').onclick=runImport;
   $('#impStop').onclick=()=>{ impCtl && impCtl.abort(); };
 }
